@@ -3,30 +3,30 @@ import Foundation
 import UserNotifications
 
 class InfraProxyManager: NSObject {
-    internal var statusItem: NSStatusItem?
-    internal var menu: NSMenu!
-    internal var socksProcess: Process?
+    private var statusItem: NSStatusItem?
+    private var menu: NSMenu!
+    private var socksProcess: Process?
     internal var isRunning = false
     
     // Configuration and logging
     internal var configuration = ProxyConfiguration()
     internal var logEntries: [LogEntry] = []
-    internal let maxLogEntries = 1000
+    private let maxLogEntries = 1000
     
     // Windows and UI references
-    internal var settingsWindow: NSWindow?
-    internal var logsWindow: NSWindow?
-    internal var settingsFields: [NSTextField] = []
-    internal var killProcessCheckbox: NSButton?
+    private var settingsWindow: NSWindow?
+    private var logsWindow: NSWindow?
+    private var settingsFields: [NSTextField] = []
+    private var killProcessCheckbox: NSButton?
     
     // Prevent rapid menu updates and control error popups
-    internal var lastMenuUpdate: Date = Date.distantPast
-    internal let menuUpdateThrottle: TimeInterval = 0.1
-    internal var suppressErrorPopups: Bool = false
+    private var lastMenuUpdate: Date = Date.distantPast
+    private let menuUpdateThrottle: TimeInterval = 0.1
+    private var suppressErrorPopups: Bool = false
     
     // Animation state
-    internal var isAnimating: Bool = false
-    internal var animationTimer: Timer?
+    private var isAnimating: Bool = false
+    private var animationTimer: Timer?
     
     override init() {
         super.init()
@@ -37,7 +37,7 @@ class InfraProxyManager: NSObject {
     }
     
     // MARK: - Menu Bar Setup
-    internal func setupMenuBar() {
+    private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
@@ -142,18 +142,24 @@ class InfraProxyManager: NSObject {
         }
     }
     
-    internal func updateLoginStatusAsync() {
+    private func updateLoginStatusAsync() {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             self?.checkTshStatusQuick { isLoggedIn in
                 DispatchQueue.main.async { [weak self] in
-                    self?.menu.item(withTitle: "Login to Teleport")?.title = isLoggedIn ? "✅ Logged into Teleport" : "Login to Teleport"
+                    let menuTitle = isLoggedIn ? "✅ Logout from Teleport" : "Login to Teleport"
+                    self?.menu.item(withTitle: "Login to Teleport")?.title = menuTitle
+                    
+                    // Also update if the title is already showing logout
+                    if let logoutItem = self?.menu.item(withTitle: "✅ Logout from Teleport") {
+                        logoutItem.title = menuTitle
+                    }
                 }
             }
         }
     }
     
     // MARK: - Port Management
-    internal func checkPortContention() -> [Int32] {
+    private func checkPortContention() -> [Int32] {
         let port = configuration.localPort
         let lsofProcess = Process()
         lsofProcess.launchPath = "/usr/sbin/lsof"
@@ -183,7 +189,7 @@ class InfraProxyManager: NSObject {
         return pids
     }
     
-    internal func killProcesses(_ pids: [Int32]) {
+    private func killProcesses(_ pids: [Int32]) {
         for pid in pids {
             let killProcess = Process()
             killProcess.launchPath = "/bin/kill"
@@ -231,7 +237,7 @@ class InfraProxyManager: NSObject {
         }
     }
     
-    internal func showPortContentionDialog(pids: [Int32]) -> Bool {
+    private func showPortContentionDialog(pids: [Int32]) -> Bool {
         let alert = NSAlert()
         alert.messageText = "Port Contention Detected"
         alert.informativeText = """
@@ -253,7 +259,7 @@ class InfraProxyManager: NSObject {
     }
     
     // MARK: - Logging
-    internal func log(_ level: LogEntry.LogLevel, _ message: String) {
+    private func log(_ level: LogEntry.LogLevel, _ message: String) {
         let entry = LogEntry(timestamp: Date(), level: level, message: message)
         logEntries.append(entry)
         
@@ -265,7 +271,7 @@ class InfraProxyManager: NSObject {
     }
     
     // MARK: - Helper Methods
-    internal func showNotification(title: String, message: String) {
+    private func showNotification(title: String, message: String) {
         if #available(macOS 10.14, *) {
             let content = UNMutableNotificationContent()
             content.title = title
@@ -283,7 +289,7 @@ class InfraProxyManager: NSObject {
         }
     }
     
-    internal func showError(message: String) {
+    private func showError(message: String) {
         if suppressErrorPopups {
             log(.error, "Error (popup suppressed): \(message)")
             return
@@ -310,7 +316,7 @@ extension InfraProxyManager {
         NSApplication.shared.terminate(nil)
     }
     
-    internal func stopWaitingAnimation() {
+    private func stopWaitingAnimation() {
         guard isAnimating else { return }
         
         isAnimating = false
@@ -362,7 +368,7 @@ extension InfraProxyManager {
         startProcessWithMonitoring()
     }
     
-    internal func startBackgroundLoginAndSocks() {
+    private func startBackgroundLoginAndSocks() {
         log(.info, "Not logged in, starting login process")
         
         let loginProcess = Process()
@@ -419,7 +425,7 @@ extension InfraProxyManager {
         }
     }
     
-    internal func waitForLoginCompletionAndStartProxy() {
+    private func waitForLoginCompletionAndStartProxy() {
         log(.info, "Login process closed, waiting for credentials to be fully available...")
         
         DispatchQueue.main.async { [weak self] in
@@ -431,7 +437,7 @@ extension InfraProxyManager {
         }
     }
     
-    internal func waitForCredentialsWithRetry() {
+    private func waitForCredentialsWithRetry() {
         log(.info, "Starting credential availability check...")
         
         DispatchQueue.main.async { [weak self] in
@@ -475,7 +481,7 @@ extension InfraProxyManager {
         }
     }
     
-    internal func checkCredentialsSync() -> Bool {
+    private func checkCredentialsSync() -> Bool {
         let statusReady = checkBasicStatusSync()
         if !statusReady {
             return false
@@ -483,7 +489,7 @@ extension InfraProxyManager {
         return checkSSHAccessSync()
     }
     
-    internal func checkBasicStatusSync() -> Bool {
+    private func checkBasicStatusSync() -> Bool {
         let semaphore = DispatchSemaphore(value: 0)
         var isReady = false
         
@@ -522,7 +528,7 @@ extension InfraProxyManager {
         }
     }
     
-    internal func checkSSHAccessSync() -> Bool {
+    private func checkSSHAccessSync() -> Bool {
         let semaphore = DispatchSemaphore(value: 0)
         var isReady = false
         
@@ -561,7 +567,7 @@ extension InfraProxyManager {
         }
     }
     
-    internal func startProcessWithMonitoring() {
+    private func startProcessWithMonitoring() {
         guard let process = socksProcess else { return }
         
         var environment = ProcessInfo.processInfo.environment
@@ -680,7 +686,7 @@ extension InfraProxyManager {
         checkTshStatus(completion: completion)
     }
     
-    internal func startWaitingAnimation() {
+    private func startWaitingAnimation() {
         guard !isAnimating else { return }
         
         isAnimating = true

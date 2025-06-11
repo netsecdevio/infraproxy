@@ -30,7 +30,7 @@ Package.resolved
 # .swiftpm
 
 .build/
-
+.vscode/
 # CocoaPods
 # Pods/
 #

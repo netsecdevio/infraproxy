@@ -27,7 +27,7 @@ extension InfraProxyManager {
         log(.info, "Configuration loaded: \(configuration.teleportProxy), \(configuration.jumpboxHost), port \(configuration.localPort)")
     }
     
-    internal func saveConfiguration() {
+    private func saveConfiguration() {
         let defaults = UserDefaults.standard
         defaults.set(configuration.teleportProxy, forKey: "teleportProxy")
         defaults.set(configuration.jumpboxHost, forKey: "jumpboxHost")
@@ -207,36 +207,115 @@ extension InfraProxyManager {
     
     // MARK: - Teleport Actions
     @objc func loginToTeleport() {
-        log(.info, "Manual login requested")
-        
-        let alert = NSAlert()
-        alert.messageText = "Teleport Login"
-        alert.informativeText = """
-        To login to Teleport manually, run this command in Terminal:
-        
-        \(configuration.tshPath) login --proxy \(configuration.teleportProxy)
-        
-        After completing the browser login, the IA Proxy will be able to connect.
-        """
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "Copy Command")
-        alert.addButton(withTitle: "Open Terminal")
-        alert.addButton(withTitle: "OK")
-        
-        let response = alert.runModal()
-        switch response {
-        case .alertFirstButtonReturn:
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString("\(configuration.tshPath) login --proxy \(configuration.teleportProxy)", forType: .string)
-            showNotification(title: "Copied", message: "Login command copied to clipboard")
-        case .alertSecondButtonReturn:
-            if #available(macOS 11.0, *) {
-                NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"), configuration: NSWorkspace.OpenConfiguration())
-            } else {
-                NSWorkspace.shared.launchApplication("Terminal")
+        // Check current login status first
+        checkTshStatusQuick { [weak self] isLoggedIn in
+            DispatchQueue.main.async {
+                if isLoggedIn {
+                    self?.performLogout()
+                } else {
+                    self?.performLogin()
+                }
             }
-        default:
-            break
+        }
+    }
+    
+    private func performLogin() {
+        log(.info, "Starting Teleport login process")
+        
+        let loginProcess = Process()
+        loginProcess.launchPath = "/bin/zsh"
+        loginProcess.arguments = ["-l", "-c", "\(configuration.tshPath) login --proxy \(configuration.teleportProxy)"]
+        
+        var environment = ProcessInfo.processInfo.environment
+        environment["HOME"] = FileManager.default.homeDirectoryForCurrentUser.path
+        environment["USER"] = NSUserName()
+        environment["SHELL"] = "/bin/zsh"
+        environment["PATH"] = "\(configuration.tshPath.replacingOccurrences(of: "/tsh", with: "")):/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        loginProcess.environment = environment
+        loginProcess.currentDirectoryPath = FileManager.default.homeDirectoryForCurrentUser.path
+        
+        let outputPipe = Pipe()
+        loginProcess.standardOutput = outputPipe
+        loginProcess.standardError = outputPipe
+        
+        let outputHandle = outputPipe.fileHandleForReading
+        outputHandle.readabilityHandler = { [weak self] handle in
+            DispatchQueue.global(qos: .background).async {
+                let data = handle.availableData
+                if let output = String(data: data, encoding: .utf8), !output.isEmpty {
+                    DispatchQueue.main.async {
+                        self?.log(.info, "Login output: \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+                    }
+                }
+            }
+        }
+        
+        loginProcess.terminationHandler = { [weak self] process in
+            outputHandle.readabilityHandler = nil
+            
+            DispatchQueue.main.async {
+                let exitCode = process.terminationStatus
+                self?.log(.info, "Login process exit code: \(exitCode)")
+                
+                if exitCode == 0 {
+                    self?.showNotification(title: "Login Successful", message: "Successfully logged into Teleport")
+                    self?.updateMenuState() // This will update the menu item text
+                } else {
+                    self?.log(.error, "Login failed with exit code: \(exitCode)")
+                    self?.showError(message: "Login failed with exit code \(exitCode)")
+                }
+            }
+        }
+        
+        do {
+            try loginProcess.run()
+            showNotification(title: "Login Started", message: "Browser authentication required")
+        } catch {
+            log(.error, "Failed to start login process: \(error.localizedDescription)")
+            showError(message: "Failed to start login process: \(error.localizedDescription)")
+        }
+    }
+    
+    private func performLogout() {
+        log(.info, "Starting Teleport logout process")
+        
+        let logoutProcess = Process()
+        logoutProcess.launchPath = "/bin/zsh"
+        logoutProcess.arguments = ["-l", "-c", "\(configuration.tshPath) logout"]
+        
+        var environment = ProcessInfo.processInfo.environment
+        environment["HOME"] = FileManager.default.homeDirectoryForCurrentUser.path
+        environment["USER"] = NSUserName()
+        environment["SHELL"] = "/bin/zsh"
+        logoutProcess.environment = environment
+        logoutProcess.currentDirectoryPath = FileManager.default.homeDirectoryForCurrentUser.path
+        
+        let pipe = Pipe()
+        logoutProcess.standardOutput = pipe
+        logoutProcess.standardError = pipe
+        
+        logoutProcess.terminationHandler = { [weak self] process in
+            DispatchQueue.main.async {
+                let exitCode = process.terminationStatus
+                self?.log(.info, "Logout process exit code: \(exitCode)")
+                
+                if exitCode == 0 {
+                    self?.showNotification(title: "Logout Successful", message: "Successfully logged out of Teleport")
+                } else {
+                    self?.log(.warning, "Logout completed with exit code: \(exitCode)")
+                    self?.showNotification(title: "Logout Completed", message: "Teleport logout completed")
+                }
+                
+                self?.updateMenuState() // This will update the menu item text
+            }
+        }
+        
+        do {
+            try logoutProcess.run()
+            showNotification(title: "Logging Out", message: "Logging out of Teleport...")
+        } catch {
+            log(.error, "Failed to start logout process: \(error.localizedDescription)")
+            showError(message: "Failed to start logout process: \(error.localizedDescription)")
         }
     }
     
@@ -321,7 +400,7 @@ extension InfraProxyManager {
     }
     
     // MARK: - UI Helper Methods
-    internal func showServerList(_ serverList: String) {
+    private func showServerList(_ serverList: String) {
         let alert = NSAlert()
         alert.messageText = "Available Teleport Servers"
         alert.informativeText = serverList.isEmpty ? "No servers found or not logged in." : serverList
@@ -329,7 +408,7 @@ extension InfraProxyManager {
         alert.runModal()
     }
     
-    internal func createSettingsWindow() {
+    private func createSettingsWindow() {
         if settingsWindow != nil {
             settingsWindow?.close()
             settingsWindow = nil
@@ -476,7 +555,7 @@ extension InfraProxyManager {
         contentView.addSubview(checkPortButton)
     }
     
-    internal func createLogsWindow() {
+    private func createLogsWindow() {
         logsWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
             styleMask: [.titled, .closable, .resizable],
@@ -513,7 +592,7 @@ extension InfraProxyManager {
         logsWindow?.contentView?.addSubview(exportButton)
     }
     
-    internal func updateLogsWindow() {
+    private func updateLogsWindow() {
         guard let scrollView = logsWindow?.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
               let textView = scrollView.documentView as? NSTextView else { return }
         
