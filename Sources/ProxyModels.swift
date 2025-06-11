@@ -1,10 +1,3 @@
-//
-//  ProxyModels.swift
-//  infraproxy
-//
-//  Created by Doug Downer on 6/9/25.
-//
-
 import Foundation
 
 // MARK: - Configuration Model

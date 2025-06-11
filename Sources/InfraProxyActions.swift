@@ -27,7 +27,7 @@ extension InfraProxyManager {
         log(.info, "Configuration loaded: \(configuration.teleportProxy), \(configuration.jumpboxHost), port \(configuration.localPort)")
     }
     
-    private func saveConfiguration() {
+    internal func saveConfiguration() {
         let defaults = UserDefaults.standard
         defaults.set(configuration.teleportProxy, forKey: "teleportProxy")
         defaults.set(configuration.jumpboxHost, forKey: "jumpboxHost")
@@ -219,7 +219,7 @@ extension InfraProxyManager {
         }
     }
     
-    private func performLogin() {
+    internal func performLogin() {
         log(.info, "Starting Teleport login process")
         
         let loginProcess = Process()
@@ -276,7 +276,7 @@ extension InfraProxyManager {
         }
     }
     
-    private func performLogout() {
+    internal func performLogout() {
         log(.info, "Starting Teleport logout process")
         
         let logoutProcess = Process()
@@ -400,7 +400,7 @@ extension InfraProxyManager {
     }
     
     // MARK: - UI Helper Methods
-    private func showServerList(_ serverList: String) {
+    internal func showServerList(_ serverList: String) {
         let alert = NSAlert()
         alert.messageText = "Available Teleport Servers"
         alert.informativeText = serverList.isEmpty ? "No servers found or not logged in." : serverList
@@ -408,7 +408,7 @@ extension InfraProxyManager {
         alert.runModal()
     }
     
-    private func createSettingsWindow() {
+    internal func createSettingsWindow() {
         if settingsWindow != nil {
             settingsWindow?.close()
             settingsWindow = nil
@@ -555,7 +555,7 @@ extension InfraProxyManager {
         contentView.addSubview(checkPortButton)
     }
     
-    private func createLogsWindow() {
+    internal func createLogsWindow() {
         logsWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
             styleMask: [.titled, .closable, .resizable],
@@ -592,7 +592,7 @@ extension InfraProxyManager {
         logsWindow?.contentView?.addSubview(exportButton)
     }
     
-    private func updateLogsWindow() {
+    internal func updateLogsWindow() {
         guard let scrollView = logsWindow?.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
               let textView = scrollView.documentView as? NSTextView else { return }
         
