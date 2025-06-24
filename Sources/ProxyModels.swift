@@ -7,6 +7,10 @@ struct ProxyConfiguration {
     var localPort: String = "2222"
     var tshPath: String = "/Applications/tsh.app/Contents/MacOS/tsh"
     var killExistingProcesses: Bool = false
+    var httpProxyEnabled: Bool = false
+    var httpProxyPort: String = "8080"
+    var httpProxyPath: String = "/usr/local/bin/hpts"
+    
 }
 
 // MARK: - Log Entry Model

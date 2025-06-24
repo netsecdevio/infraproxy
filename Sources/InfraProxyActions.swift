@@ -21,21 +21,60 @@ extension InfraProxyManager {
         if let path = defaults.string(forKey: "tshPath") {
             configuration.tshPath = path
         }
+        if let httpPort = defaults.string(forKey: "httpProxyPort") {
+            configuration.httpProxyPort = httpPort
+        }
+        if let httpPath = defaults.string(forKey: "httpProxyPath") {
+            configuration.httpProxyPath = httpPath
+        }
         
         configuration.killExistingProcesses = defaults.bool(forKey: "killExistingProcesses")
-        
-        log(.info, "Configuration loaded: \(configuration.teleportProxy), \(configuration.jumpboxHost), port \(configuration.localPort)")
+        configuration.httpProxyEnabled = defaults.bool(forKey: "httpProxyEnabled")
+        self.log(.info, "Configuration loaded: \(configuration.teleportProxy), \(configuration.jumpboxHost), SOCKS port \(configuration.localPort), HTTP port \(configuration.httpProxyPort)")
     }
     
-    internal func saveConfiguration() {
+    private func saveConfiguration() {
         let defaults = UserDefaults.standard
         defaults.set(configuration.teleportProxy, forKey: "teleportProxy")
         defaults.set(configuration.jumpboxHost, forKey: "jumpboxHost")
         defaults.set(configuration.localPort, forKey: "localPort")
         defaults.set(configuration.tshPath, forKey: "tshPath")
         defaults.set(configuration.killExistingProcesses, forKey: "killExistingProcesses")
+        defaults.set(configuration.httpProxyEnabled, forKey: "httpProxyEnabled")
+        defaults.set(configuration.httpProxyPort, forKey: "httpProxyPort")
+        defaults.set(configuration.httpProxyPath, forKey: "httpProxyPath")
         
-        log(.info, "Configuration saved")
+        self.log(.info, "Configuration saved")
+    }
+    
+    // MARK: - Port Management Helper
+    private func checkPortContention(for port: String) -> [Int32] {
+        let lsofProcess = Process()
+        lsofProcess.launchPath = "/usr/sbin/lsof"
+        lsofProcess.arguments = ["-ti", ":\(port)"]
+        
+        let pipe = Pipe()
+        lsofProcess.standardOutput = pipe
+        lsofProcess.standardError = Pipe()
+        
+        var pids: [Int32] = []
+        
+        do {
+            try lsofProcess.run()
+            lsofProcess.waitUntilExit()
+            
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: data, encoding: .utf8) {
+                pids = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .components(separatedBy: .newlines)
+                    .compactMap { Int32($0) }
+                    .filter { $0 > 0 }
+            }
+        } catch {
+            // Silently handle errors for this helper method
+        }
+        
+        return pids
     }
     
     // MARK: - Proxy Actions
@@ -48,11 +87,11 @@ extension InfraProxyManager {
         }
         
         if !handlePortContention() {
-            log(.error, "Cannot start IA Proxy due to port contention")
+            self.log(.error, "Cannot start IA Proxy due to port contention")
             return
         }
         
-        log(.info, "Starting IA Proxy...")
+        self.log(.info, "Starting IA Proxy...")
         
         checkTshStatusQuick { [weak self] isLoggedIn in
             if isLoggedIn {
@@ -66,7 +105,7 @@ extension InfraProxyManager {
     @objc func stopProxy() {
         guard isRunning, let process = socksProcess else { return }
         
-        log(.info, "Stopping IA Proxy process")
+        self.log(.info, "Stopping IA Proxy process")
         process.terminate()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
@@ -87,10 +126,102 @@ extension InfraProxyManager {
     }
     
     @objc func restartProxy() {
-        log(.info, "Restarting IA Proxy")
+        self.log(.info, "Restarting IA Proxy")
         stopProxy()
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
             self?.startProxy()
+        }
+    }
+    
+    // MARK: - HTTP Proxy Actions
+    @objc func startHttpProxy() {
+        guard !isHttpProxyRunning else { return }
+        
+        if !configuration.httpProxyEnabled {
+            let alert = NSAlert()
+            alert.messageText = "HTTP Proxy Disabled"
+            alert.informativeText = "HTTP Proxy is not enabled. Please enable it in Settings."
+            alert.alertStyle = .warning
+            alert.runModal()
+            return
+        }
+        
+        // Check HTTP proxy port specifically
+        let httpPids = checkPortContention(for: configuration.httpProxyPort)
+        if !httpPids.isEmpty {
+            if configuration.killExistingProcesses {
+                self.log(.info, "Killing existing processes on HTTP port \(configuration.httpProxyPort)")
+                killProcesses(httpPids)
+            } else {
+                let alert = NSAlert()
+                alert.messageText = "HTTP Port Contention"
+                alert.informativeText = "Port \(configuration.httpProxyPort) is in use by PIDs: \(httpPids.map(String.init).joined(separator: ", "))\n\nTerminate these processes?"
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "Terminate & Continue")
+                alert.addButton(withTitle: "Cancel")
+                
+                if alert.runModal() != .alertFirstButtonReturn {
+                    return
+                }
+                killProcesses(httpPids)
+            }
+        }
+        
+        self.log(.info, "Starting HTTP Proxy...")
+        
+        httpProxyProcess = Process()
+        httpProxyProcess?.launchPath = configuration.httpProxyPath
+        httpProxyProcess?.arguments = ["-p", configuration.httpProxyPort]
+        
+        var environment = ProcessInfo.processInfo.environment
+        environment["HOME"] = FileManager.default.homeDirectoryForCurrentUser.path
+        httpProxyProcess?.environment = environment
+        
+        let outputPipe = Pipe()
+        httpProxyProcess?.standardOutput = outputPipe
+        httpProxyProcess?.standardError = outputPipe
+        
+        httpProxyProcess?.terminationHandler = { [weak self] process in
+            DispatchQueue.main.async {
+                self?.isHttpProxyRunning = false
+                self?.updateMenuState()
+                self?.log(.info, "HTTP Proxy terminated")
+            }
+        }
+        
+        do {
+            try httpProxyProcess?.run()
+            isHttpProxyRunning = true
+            updateMenuState()
+            self.log(.info, "HTTP Proxy started on port \(configuration.httpProxyPort)")
+            showNotification(title: "HTTP Proxy Started", message: "Running on localhost:\(configuration.httpProxyPort)")
+        } catch {
+            self.log(.error, "Failed to start HTTP Proxy: \(error.localizedDescription)")
+            showError(message: "Failed to start HTTP Proxy: \(error.localizedDescription)")
+        }
+    }
+
+    @objc func stopHttpProxy() {
+        guard isHttpProxyRunning, let process = httpProxyProcess else { return }
+        
+        self.log(.info, "Stopping HTTP Proxy")
+        process.terminate()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            if process.isRunning {
+                process.interrupt()
+            }
+            self?.isHttpProxyRunning = false
+            self?.updateMenuState()
+            self?.showNotification(title: "HTTP Proxy Stopped", message: "HTTP Proxy has been stopped")
+        }
+    }
+
+    @objc func restartHttpProxy() {
+        self.log(.info, "Restarting HTTP Proxy")
+        stopHttpProxy()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            self?.startHttpProxy()
         }
     }
     
@@ -123,6 +254,20 @@ extension InfraProxyManager {
             configuration.tshPath = pathField.stringValue
         }
         
+        // Save HTTP proxy settings
+        if let httpEnabledCheckbox = settingsWindow?.contentView?.subviews.first(where: {
+            ($0 as? NSButton)?.identifier?.rawValue == "httpEnabledCheckbox"
+        }) as? NSButton {
+            configuration.httpProxyEnabled = httpEnabledCheckbox.state == .on
+        }
+
+        if let httpPortField = settingsFields.first(where: { $0.identifier?.rawValue == "httpPortField" }) {
+            configuration.httpProxyPort = httpPortField.stringValue
+        }
+        if let httpPathField = settingsFields.first(where: { $0.identifier?.rawValue == "httpPathField" }) {
+            configuration.httpProxyPath = httpPathField.stringValue
+        }
+        
         configuration.killExistingProcesses = killProcessCheckbox?.state == .on
         
         saveConfiguration()
@@ -151,25 +296,44 @@ extension InfraProxyManager {
         }
     }
     
+    @objc func browseHttpPath() {
+        let openPanel = NSOpenPanel()
+        openPanel.canChooseFiles = true
+        openPanel.canChooseDirectories = false
+        openPanel.allowsMultipleSelection = false
+        openPanel.directoryURL = URL(fileURLWithPath: "/usr/local/bin")
+        
+        if openPanel.runModal() == .OK {
+            if let url = openPanel.url {
+                if let pathField = settingsFields.first(where: { $0.identifier?.rawValue == "httpPathField" }) {
+                    pathField.stringValue = url.path
+                }
+            }
+        }
+    }
+    
     @objc func checkPortUsage() {
-        let pids = checkPortContention()
+        let socksPids = checkPortContention(for: configuration.localPort)
+        var message = "SOCKS Port \(configuration.localPort): "
+        message += socksPids.isEmpty ? "✅ Available" : "⚠️ In use by PIDs: \(socksPids.map(String.init).joined(separator: ", "))"
         
-        let alert = NSAlert()
-        alert.messageText = "Port \(configuration.localPort) Status"
-        
-        if pids.isEmpty {
-            alert.informativeText = "✅ Port \(configuration.localPort) is available"
-            alert.alertStyle = .informational
-        } else {
-            alert.informativeText = "⚠️ Port \(configuration.localPort) is in use by processes: \(pids.map(String.init).joined(separator: ", "))"
-            alert.alertStyle = .warning
+        if configuration.httpProxyEnabled {
+            let httpPids = checkPortContention(for: configuration.httpProxyPort)
+            message += "\n\nHTTP Port \(configuration.httpProxyPort): "
+            message += httpPids.isEmpty ? "✅ Available" : "⚠️ In use by PIDs: \(httpPids.map(String.init).joined(separator: ", "))"
         }
         
+        let alert = NSAlert()
+        alert.messageText = "Port Status"
+        alert.informativeText = message
+        
+        let allPortsAvailable = socksPids.isEmpty && (configuration.httpProxyEnabled ? checkPortContention(for: configuration.httpProxyPort).isEmpty : true)
+        alert.alertStyle = allPortsAvailable ? .informational : .warning
         alert.runModal()
     }
     
     @objc func testConnection() {
-        log(.info, "Testing connection with current settings")
+        self.log(.info, "Testing connection with current settings")
         
         let testProcess = Process()
         testProcess.launchPath = "/bin/zsh"
@@ -200,7 +364,7 @@ extension InfraProxyManager {
         do {
             try testProcess.run()
         } catch {
-            log(.error, "Failed to test connection: \(error)")
+            self.log(.error, "Failed to test connection: \(error)")
             showError(message: "Failed to test connection: \(error.localizedDescription)")
         }
     }
@@ -219,8 +383,8 @@ extension InfraProxyManager {
         }
     }
     
-    internal func performLogin() {
-        log(.info, "Starting Teleport login process")
+    private func performLogin() {
+        self.log(.info, "Starting Teleport login process")
         
         let loginProcess = Process()
         loginProcess.launchPath = "/bin/zsh"
@@ -259,7 +423,7 @@ extension InfraProxyManager {
                 
                 if exitCode == 0 {
                     self?.showNotification(title: "Login Successful", message: "Successfully logged into Teleport")
-                    self?.updateMenuState() // This will update the menu item text
+                    self?.updateMenuState()
                 } else {
                     self?.log(.error, "Login failed with exit code: \(exitCode)")
                     self?.showError(message: "Login failed with exit code \(exitCode)")
@@ -271,13 +435,13 @@ extension InfraProxyManager {
             try loginProcess.run()
             showNotification(title: "Login Started", message: "Browser authentication required")
         } catch {
-            log(.error, "Failed to start login process: \(error.localizedDescription)")
+            self.log(.error, "Failed to start login process: \(error.localizedDescription)")
             showError(message: "Failed to start login process: \(error.localizedDescription)")
         }
     }
     
-    internal func performLogout() {
-        log(.info, "Starting Teleport logout process")
+    private func performLogout() {
+        self.log(.info, "Starting Teleport logout process")
         
         let logoutProcess = Process()
         logoutProcess.launchPath = "/bin/zsh"
@@ -306,7 +470,7 @@ extension InfraProxyManager {
                     self?.showNotification(title: "Logout Completed", message: "Teleport logout completed")
                 }
                 
-                self?.updateMenuState() // This will update the menu item text
+                self?.updateMenuState()
             }
         }
         
@@ -314,13 +478,13 @@ extension InfraProxyManager {
             try logoutProcess.run()
             showNotification(title: "Logging Out", message: "Logging out of Teleport...")
         } catch {
-            log(.error, "Failed to start logout process: \(error.localizedDescription)")
+            self.log(.error, "Failed to start logout process: \(error.localizedDescription)")
             showError(message: "Failed to start logout process: \(error.localizedDescription)")
         }
     }
     
     @objc func checkTeleportStatus() {
-        log(.info, "Checking Teleport status")
+        self.log(.info, "Checking Teleport status")
         checkTshStatus { [weak self] isLoggedIn in
             let status = isLoggedIn ? "✅ Logged in" : "❌ Not logged in"
             self?.log(.info, "Teleport status: \(status)")
@@ -329,7 +493,7 @@ extension InfraProxyManager {
     }
     
     @objc func listServers() {
-        log(.info, "Listing available servers")
+        self.log(.info, "Listing available servers")
         
         let listProcess = Process()
         listProcess.launchPath = "/bin/zsh"
@@ -352,7 +516,7 @@ extension InfraProxyManager {
         do {
             try listProcess.run()
         } catch {
-            log(.error, "Failed to list servers: \(error)")
+            self.log(.error, "Failed to list servers: \(error)")
             showError(message: "Failed to list servers: \(error.localizedDescription)")
         }
     }
@@ -370,7 +534,7 @@ extension InfraProxyManager {
     @objc func clearLogs() {
         logEntries.removeAll()
         updateLogsWindow()
-        log(.info, "Logs cleared")
+        self.log(.info, "Logs cleared")
     }
     
     @objc func exportLogs() {
@@ -400,7 +564,7 @@ extension InfraProxyManager {
     }
     
     // MARK: - UI Helper Methods
-    internal func showServerList(_ serverList: String) {
+    private func showServerList(_ serverList: String) {
         let alert = NSAlert()
         alert.messageText = "Available Teleport Servers"
         alert.informativeText = serverList.isEmpty ? "No servers found or not logged in." : serverList
@@ -408,14 +572,14 @@ extension InfraProxyManager {
         alert.runModal()
     }
     
-    internal func createSettingsWindow() {
+    private func createSettingsWindow() {
         if settingsWindow != nil {
             settingsWindow?.close()
             settingsWindow = nil
         }
         
         settingsWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 480),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 580),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -428,15 +592,15 @@ extension InfraProxyManager {
         
         guard let contentView = settingsWindow?.contentView else { return }
         
-        var yPosition: CGFloat = 430
+        var yPosition: CGFloat = 540
         
         // Header
         let headerLabel = NSTextField(labelWithString: "Identity Aware (IA) Proxy Configuration")
-        headerLabel.frame = NSRect(x: 20, y: yPosition, width: 460, height: 20)
+        headerLabel.frame = NSRect(x: 20, y: yPosition, width: 480, height: 20)
         headerLabel.font = NSFont.boldSystemFont(ofSize: 14)
         contentView.addSubview(headerLabel)
         
-        yPosition -= 40
+        yPosition -= 50
         
         // Teleport Proxy
         let proxyLabel = NSTextField(labelWithString: "Teleport Proxy:")
@@ -444,7 +608,7 @@ extension InfraProxyManager {
         contentView.addSubview(proxyLabel)
         
         let proxyField = NSTextField()
-        proxyField.frame = NSRect(x: 150, y: yPosition, width: 320, height: 22)
+        proxyField.frame = NSRect(x: 150, y: yPosition, width: 340, height: 22)
         proxyField.stringValue = configuration.teleportProxy
         proxyField.identifier = NSUserInterfaceItemIdentifier("proxyField")
         proxyField.isEditable = true
@@ -453,7 +617,7 @@ extension InfraProxyManager {
         contentView.addSubview(proxyField)
         settingsFields.append(proxyField)
         
-        yPosition -= 40
+        yPosition -= 35
         
         // Jumpbox Host
         let hostLabel = NSTextField(labelWithString: "Jumpbox Host:")
@@ -461,7 +625,7 @@ extension InfraProxyManager {
         contentView.addSubview(hostLabel)
         
         let hostField = NSTextField()
-        hostField.frame = NSRect(x: 150, y: yPosition, width: 320, height: 22)
+        hostField.frame = NSRect(x: 150, y: yPosition, width: 340, height: 22)
         hostField.stringValue = configuration.jumpboxHost
         hostField.identifier = NSUserInterfaceItemIdentifier("hostField")
         hostField.isEditable = true
@@ -470,10 +634,10 @@ extension InfraProxyManager {
         contentView.addSubview(hostField)
         settingsFields.append(hostField)
         
-        yPosition -= 40
+        yPosition -= 35
         
-        // Local Port
-        let portLabel = NSTextField(labelWithString: "Local Port:")
+        // SOCKS Port
+        let portLabel = NSTextField(labelWithString: "SOCKS Port:")
         portLabel.frame = NSRect(x: 20, y: yPosition, width: 120, height: 20)
         contentView.addSubview(portLabel)
         
@@ -487,7 +651,7 @@ extension InfraProxyManager {
         contentView.addSubview(portField)
         settingsFields.append(portField)
         
-        yPosition -= 40
+        yPosition -= 35
         
         // TSH Path
         let pathLabel = NSTextField(labelWithString: "TSH Path:")
@@ -495,7 +659,7 @@ extension InfraProxyManager {
         contentView.addSubview(pathLabel)
         
         let pathField = NSTextField()
-        pathField.frame = NSRect(x: 150, y: yPosition, width: 250, height: 22)
+        pathField.frame = NSRect(x: 150, y: yPosition, width: 270, height: 22)
         pathField.stringValue = configuration.tshPath
         pathField.identifier = NSUserInterfaceItemIdentifier("pathField")
         pathField.isEditable = true
@@ -504,43 +668,112 @@ extension InfraProxyManager {
         settingsFields.append(pathField)
         
         let browseButton = NSButton(title: "Browse...", target: self, action: #selector(browseTshPath))
-        browseButton.frame = NSRect(x: 410, y: yPosition, width: 70, height: 22)
+        browseButton.frame = NSRect(x: 430, y: yPosition, width: 70, height: 22)
         contentView.addSubview(browseButton)
         
-        yPosition -= 60
+        yPosition -= 50
+        
+        // HTTP Proxy section separator
+        let separatorLine = NSBox()
+        separatorLine.frame = NSRect(x: 20, y: yPosition, width: 480, height: 1)
+        separatorLine.boxType = .separator
+        contentView.addSubview(separatorLine)
+        
+        yPosition -= 30
+        
+        // HTTP Proxy section header
+        let httpProxyLabel = NSTextField(labelWithString: "HTTP Proxy Configuration")
+        httpProxyLabel.frame = NSRect(x: 20, y: yPosition, width: 480, height: 20)
+        httpProxyLabel.font = NSFont.boldSystemFont(ofSize: 14)
+        contentView.addSubview(httpProxyLabel)
+        
+        yPosition -= 40
+        
+        // Enable HTTP Proxy checkbox
+        let httpEnabledCheckbox = NSButton(checkboxWithTitle: "Enable HTTP Proxy", target: nil, action: nil)
+        httpEnabledCheckbox.frame = NSRect(x: 20, y: yPosition, width: 200, height: 20)
+        httpEnabledCheckbox.state = configuration.httpProxyEnabled ? .on : .off
+        httpEnabledCheckbox.identifier = NSUserInterfaceItemIdentifier("httpEnabledCheckbox")
+        contentView.addSubview(httpEnabledCheckbox)
+        
+        yPosition -= 35
+        
+        // HTTP Proxy Port
+        let httpPortLabel = NSTextField(labelWithString: "HTTP Port:")
+        httpPortLabel.frame = NSRect(x: 20, y: yPosition, width: 120, height: 20)
+        contentView.addSubview(httpPortLabel)
+        
+        let httpPortField = NSTextField()
+        httpPortField.frame = NSRect(x: 150, y: yPosition, width: 100, height: 22)
+        httpPortField.stringValue = configuration.httpProxyPort
+        httpPortField.identifier = NSUserInterfaceItemIdentifier("httpPortField")
+        httpPortField.isEditable = true
+        httpPortField.isSelectable = true
+        httpPortField.placeholderString = "8080"
+        contentView.addSubview(httpPortField)
+        settingsFields.append(httpPortField)
+        
+        yPosition -= 35
+        
+        // HTTP Proxy Path
+        let httpPathLabel = NSTextField(labelWithString: "HPTS Path:")
+        httpPathLabel.frame = NSRect(x: 20, y: yPosition, width: 120, height: 20)
+        contentView.addSubview(httpPathLabel)
+        
+        let httpPathField = NSTextField()
+        httpPathField.frame = NSRect(x: 150, y: yPosition, width: 270, height: 22)
+        httpPathField.stringValue = configuration.httpProxyPath
+        httpPathField.identifier = NSUserInterfaceItemIdentifier("httpPathField")
+        httpPathField.isEditable = true
+        httpPathField.isSelectable = true
+        httpPathField.placeholderString = "/usr/local/bin/hpts"
+        contentView.addSubview(httpPathField)
+        settingsFields.append(httpPathField)
+        
+        let browseHttpButton = NSButton(title: "Browse...", target: self, action: #selector(browseHttpPath))
+        browseHttpButton.frame = NSRect(x: 430, y: yPosition, width: 70, height: 22)
+        contentView.addSubview(browseHttpButton)
+        
+        yPosition -= 50
+        
+        // Port Management section separator
+        let separatorLine2 = NSBox()
+        separatorLine2.frame = NSRect(x: 20, y: yPosition, width: 480, height: 1)
+        separatorLine2.boxType = .separator
+        contentView.addSubview(separatorLine2)
+        
+        yPosition -= 30
         
         // Port Management section
         let portManagementLabel = NSTextField(labelWithString: "Port Management")
-        portManagementLabel.frame = NSRect(x: 20, y: yPosition, width: 460, height: 20)
-        portManagementLabel.font = NSFont.boldSystemFont(ofSize: 12)
+        portManagementLabel.frame = NSRect(x: 20, y: yPosition, width: 480, height: 20)
+        portManagementLabel.font = NSFont.boldSystemFont(ofSize: 14)
         contentView.addSubview(portManagementLabel)
         
-        yPosition -= 30
+        yPosition -= 35
         
         // Kill existing processes checkbox
         killProcessCheckbox = NSButton(checkboxWithTitle: "Automatically terminate processes using the same port", target: nil, action: nil)
-        killProcessCheckbox?.frame = NSRect(x: 20, y: yPosition, width: 400, height: 20)
+        killProcessCheckbox?.frame = NSRect(x: 20, y: yPosition, width: 450, height: 20)
         killProcessCheckbox?.state = configuration.killExistingProcesses ? .on : .off
         contentView.addSubview(killProcessCheckbox!)
         
-        yPosition -= 30
+        yPosition -= 25
         
-        let warningLabel = NSTextField(labelWithString: "⚠️ Warning: This will forcefully terminate other processes using the configured port")
-        warningLabel.frame = NSRect(x: 20, y: yPosition, width: 460, height: 20)
+        let warningLabel = NSTextField(labelWithString: "⚠️ Warning: This will forcefully terminate other processes using configured ports")
+        warningLabel.frame = NSRect(x: 20, y: yPosition, width: 480, height: 20)
         warningLabel.font = NSFont.systemFont(ofSize: 10)
         warningLabel.textColor = .systemOrange
         contentView.addSubview(warningLabel)
         
-        yPosition -= 60
-        
-        // Save/Cancel buttons
+        // Buttons at bottom
         let saveButton = NSButton(title: "Save", target: self, action: #selector(saveSettings))
-        saveButton.frame = NSRect(x: 400, y: 20, width: 80, height: 30)
+        saveButton.frame = NSRect(x: 420, y: 20, width: 80, height: 30)
         saveButton.keyEquivalent = "\r"
         contentView.addSubview(saveButton)
         
         let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancelSettings))
-        cancelButton.frame = NSRect(x: 310, y: 20, width: 80, height: 30)
+        cancelButton.frame = NSRect(x: 330, y: 20, width: 80, height: 30)
         cancelButton.keyEquivalent = "\u{1b}"
         contentView.addSubview(cancelButton)
         
@@ -549,13 +782,13 @@ extension InfraProxyManager {
         testButton.frame = NSRect(x: 20, y: 20, width: 120, height: 30)
         contentView.addSubview(testButton)
         
-        // Check port button
-        let checkPortButton = NSButton(title: "Check Port", target: self, action: #selector(checkPortUsage))
+        // Check ports button
+        let checkPortButton = NSButton(title: "Check Ports", target: self, action: #selector(checkPortUsage))
         checkPortButton.frame = NSRect(x: 150, y: 20, width: 100, height: 30)
         contentView.addSubview(checkPortButton)
     }
     
-    internal func createLogsWindow() {
+    private func createLogsWindow() {
         logsWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
             styleMask: [.titled, .closable, .resizable],
@@ -592,7 +825,7 @@ extension InfraProxyManager {
         logsWindow?.contentView?.addSubview(exportButton)
     }
     
-    internal func updateLogsWindow() {
+    private func updateLogsWindow() {
         guard let scrollView = logsWindow?.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
               let textView = scrollView.documentView as? NSTextView else { return }
         

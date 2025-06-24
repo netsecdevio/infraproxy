@@ -5,19 +5,19 @@ import UserNotifications
 class InfraProxyManager: NSObject {
     private var statusItem: NSStatusItem?
     private var menu: NSMenu!
-    private var socksProcess: Process?
+    internal var socksProcess: Process?
     internal var isRunning = false
     
     // Configuration and logging
     internal var configuration = ProxyConfiguration()
     internal var logEntries: [LogEntry] = []
-    private let maxLogEntries = 1000
+    internal let maxLogEntries = 1000
     
     // Windows and UI references
-    private var settingsWindow: NSWindow?
-    private var logsWindow: NSWindow?
-    private var settingsFields: [NSTextField] = []
-    private var killProcessCheckbox: NSButton?
+    internal var settingsWindow: NSWindow?
+    internal var logsWindow: NSWindow?
+    internal var settingsFields: [NSTextField] = []
+    internal var killProcessCheckbox: NSButton?
     
     // Prevent rapid menu updates and control error popups
     private var lastMenuUpdate: Date = Date.distantPast
@@ -27,6 +27,9 @@ class InfraProxyManager: NSObject {
     // Animation state
     private var isAnimating: Bool = false
     private var animationTimer: Timer?
+    
+    internal var httpProxyProcess: Process?
+    internal var isHttpProxyRunning = false
     
     override init() {
         super.init()
@@ -47,30 +50,49 @@ class InfraProxyManager: NSObject {
         
         menu = NSMenu()
         
-        // IA Proxy controls
+        // IA Proxy controls (existing)
         let startItem = NSMenuItem(title: "Start IA Proxy", action: #selector(startProxy), keyEquivalent: "")
         startItem.target = self
         menu.addItem(startItem)
-        
+
         let stopItem = NSMenuItem(title: "Stop IA Proxy", action: #selector(stopProxy), keyEquivalent: "")
         stopItem.target = self
         menu.addItem(stopItem)
-        
+
         let restartItem = NSMenuItem(title: "Restart IA Proxy", action: #selector(restartProxy), keyEquivalent: "")
         restartItem.target = self
         menu.addItem(restartItem)
-        
+
+        // HTTP Proxy submenu (NEW)
+        let httpProxyItem = NSMenuItem(title: "HTTP Proxy", action: nil, keyEquivalent: "")
+        let httpProxySubmenu = NSMenu()
+
+        let startHttpItem = NSMenuItem(title: "Start HTTP Proxy", action: #selector(startHttpProxy), keyEquivalent: "")
+        startHttpItem.target = self
+        httpProxySubmenu.addItem(startHttpItem)
+
+        let stopHttpItem = NSMenuItem(title: "Stop HTTP Proxy", action: #selector(stopHttpProxy), keyEquivalent: "")
+        stopHttpItem.target = self
+        httpProxySubmenu.addItem(stopHttpItem)
+
+        let restartHttpItem = NSMenuItem(title: "Restart HTTP Proxy", action: #selector(restartHttpProxy), keyEquivalent: "")
+        restartHttpItem.target = self
+        httpProxySubmenu.addItem(restartHttpItem)
+
+        httpProxyItem.submenu = httpProxySubmenu
+        menu.addItem(httpProxyItem)
+
         menu.addItem(NSMenuItem.separator())
         
-        // Login management
+        // Login management (PRESERVED)
         let loginItem = NSMenuItem(title: "Login to Teleport", action: #selector(loginToTeleport), keyEquivalent: "")
         loginItem.target = self
         menu.addItem(loginItem)
-        
+
         let statusCheckItem = NSMenuItem(title: "Check Status", action: #selector(checkTeleportStatus), keyEquivalent: "")
         statusCheckItem.target = self
         menu.addItem(statusCheckItem)
-        
+
         menu.addItem(NSMenuItem.separator())
         
         // Configuration and logging
@@ -146,21 +168,33 @@ class InfraProxyManager: NSObject {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             self?.checkTshStatusQuick { isLoggedIn in
                 DispatchQueue.main.async { [weak self] in
-                    let menuTitle = isLoggedIn ? "✅ Logout from Teleport" : "Login to Teleport"
-                    self?.menu.item(withTitle: "Login to Teleport")?.title = menuTitle
-                    
-                    // Also update if the title is already showing logout
-                    if let logoutItem = self?.menu.item(withTitle: "✅ Logout from Teleport") {
-                        logoutItem.title = menuTitle
-                    }
+                    self?.menu.item(withTitle: "Login to Teleport")?.title = isLoggedIn ? "✅ Logged into Teleport" : "Login to Teleport"
                 }
             }
         }
     }
     
     // MARK: - Port Management
-    private func checkPortContention() -> [Int32] {
-        let port = configuration.localPort
+    internal func checkPortContention() -> [Int32] {
+        var allPids: [Int32] = []
+        
+        // Check SOCKS port
+        let socksPort = configuration.localPort
+        let socksPids = checkPortContentionForPort(socksPort)
+        allPids.append(contentsOf: socksPids)
+        
+        // Check HTTP proxy port if enabled
+        if configuration.httpProxyEnabled {
+            let httpPort = configuration.httpProxyPort
+            let httpPids = checkPortContentionForPort(httpPort)
+            allPids.append(contentsOf: httpPids)
+        }
+        
+        return allPids
+    }
+
+    // Add this new helper method to InfraProxyManager.swift
+    private func checkPortContentionForPort(_ port: String) -> [Int32] {
         let lsofProcess = Process()
         lsofProcess.launchPath = "/usr/sbin/lsof"
         lsofProcess.arguments = ["-ti", ":\(port)"]
@@ -183,13 +217,13 @@ class InfraProxyManager: NSObject {
                     .filter { $0 > 0 }
             }
         } catch {
-            log(.warning, "Failed to check port contention: \(error.localizedDescription)")
+            log(.warning, "Failed to check port contention for port \(port): \(error.localizedDescription)")
         }
         
         return pids
     }
     
-    private func killProcesses(_ pids: [Int32]) {
+    internal func killProcesses(_ pids: [Int32]) {
         for pid in pids {
             let killProcess = Process()
             killProcess.launchPath = "/bin/kill"
@@ -237,15 +271,25 @@ class InfraProxyManager: NSObject {
         }
     }
     
-    private func showPortContentionDialog(pids: [Int32]) -> Bool {
+    internal func showPortContentionDialog(pids: [Int32]) -> Bool {
         let alert = NSAlert()
         alert.messageText = "Port Contention Detected"
-        alert.informativeText = """
-        Port \(configuration.localPort) is currently in use by the following processes:
-        PIDs: \(pids.map(String.init).joined(separator: ", "))
         
-        Would you like to terminate these processes and continue?
-        """
+        var conflictDetails = "The following ports are in use:\n"
+        
+        let socksPids = checkPortContentionForPort(configuration.localPort)
+        if !socksPids.isEmpty {
+            conflictDetails += "• SOCKS Port \(configuration.localPort): PIDs \(socksPids.map(String.init).joined(separator: ", "))\n"
+        }
+        
+        if configuration.httpProxyEnabled {
+            let httpPids = checkPortContentionForPort(configuration.httpProxyPort)
+            if !httpPids.isEmpty {
+                conflictDetails += "• HTTP Port \(configuration.httpProxyPort): PIDs \(httpPids.map(String.init).joined(separator: ", "))\n"
+            }
+        }
+        
+        alert.informativeText = conflictDetails + "\nWould you like to terminate these processes and continue?"
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Terminate & Continue")
         alert.addButton(withTitle: "Cancel")
@@ -259,7 +303,7 @@ class InfraProxyManager: NSObject {
     }
     
     // MARK: - Logging
-    private func log(_ level: LogEntry.LogLevel, _ message: String) {
+    internal func log(_ level: LogEntry.LogLevel, _ message: String) {
         let entry = LogEntry(timestamp: Date(), level: level, message: message)
         logEntries.append(entry)
         
@@ -271,7 +315,7 @@ class InfraProxyManager: NSObject {
     }
     
     // MARK: - Helper Methods
-    private func showNotification(title: String, message: String) {
+    internal func showNotification(title: String, message: String) {
         if #available(macOS 10.14, *) {
             let content = UNMutableNotificationContent()
             content.title = title
@@ -289,7 +333,7 @@ class InfraProxyManager: NSObject {
         }
     }
     
-    private func showError(message: String) {
+    internal func showError(message: String) {
         if suppressErrorPopups {
             log(.error, "Error (popup suppressed): \(message)")
             return
@@ -368,7 +412,7 @@ extension InfraProxyManager {
         startProcessWithMonitoring()
     }
     
-    private func startBackgroundLoginAndSocks() {
+    internal func startBackgroundLoginAndSocks() {
         log(.info, "Not logged in, starting login process")
         
         let loginProcess = Process()
