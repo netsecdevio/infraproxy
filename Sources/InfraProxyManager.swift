@@ -134,11 +134,22 @@ class InfraProxyManager: NSObject {
             guard let self = self else { return }
             
             if let statusMenuItem = self.menu.item(withTag: 100) {
+                var statusText = "Status: "
                 if self.isRunning {
-                    statusMenuItem.title = "Status: IA Proxy running on localhost:\(self.configuration.localPort)"
+                    statusText += "IA Proxy running on localhost:\(self.configuration.localPort)"
                 } else {
-                    statusMenuItem.title = "Status: Stopped"
+                    statusText += "IA Proxy stopped"
                 }
+                
+                if self.configuration.httpProxyEnabled {
+                    if self.isHttpProxyRunning {
+                        statusText += " | HTTP Proxy running on localhost:\(self.configuration.httpProxyPort)"
+                    } else {
+                        statusText += " | HTTP Proxy stopped"
+                    }
+                }
+                
+                statusMenuItem.title = statusText
             }
             
             if let button = self.statusItem?.button {
@@ -159,6 +170,13 @@ class InfraProxyManager: NSObject {
             self.menu.item(withTitle: "Start IA Proxy")?.isEnabled = !self.isRunning
             self.menu.item(withTitle: "Stop IA Proxy")?.isEnabled = self.isRunning
             self.menu.item(withTitle: "Restart IA Proxy")?.isEnabled = self.isRunning
+            
+            // Update HTTP proxy menu items if they exist
+            if let httpSubmenu = self.menu.item(withTitle: "HTTP Proxy")?.submenu {
+                httpSubmenu.item(withTitle: "Start")?.isEnabled = !self.isHttpProxyRunning && self.configuration.httpProxyEnabled
+                httpSubmenu.item(withTitle: "Stop")?.isEnabled = self.isHttpProxyRunning
+                httpSubmenu.item(withTitle: "Restart")?.isEnabled = self.isHttpProxyRunning
+            }
             
             self.updateLoginStatusAsync()
         }
