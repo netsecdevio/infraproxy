@@ -171,8 +171,7 @@ extension InfraProxyManager {
         
         httpProxyProcess = Process()
         httpProxyProcess?.launchPath = configuration.httpProxyPath
-        // Use the correct command format: hpts -s localhost:socks_port -p http_proxy_port
-        httpProxyProcess?.arguments = ["-s", "localhost:\(configuration.localPort)", "-p", configuration.httpProxyPort]
+        httpProxyProcess?.arguments = ["-p", configuration.httpProxyPort]
         
         var environment = ProcessInfo.processInfo.environment
         environment["HOME"] = FileManager.default.homeDirectoryForCurrentUser.path
@@ -182,27 +181,11 @@ extension InfraProxyManager {
         httpProxyProcess?.standardOutput = outputPipe
         httpProxyProcess?.standardError = outputPipe
         
-        // Monitor output for debugging
-        let outputHandle = outputPipe.fileHandleForReading
-        outputHandle.readabilityHandler = { [weak self] handle in
-            DispatchQueue.global(qos: .background).async {
-                let data = handle.availableData
-                if let output = String(data: data, encoding: .utf8), !output.isEmpty {
-                    DispatchQueue.main.async {
-                        self?.log(.info, "HTTP Proxy output: \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
-                    }
-                }
-            }
-        }
-        
         httpProxyProcess?.terminationHandler = { [weak self] process in
-            outputHandle.readabilityHandler = nil
-            
             DispatchQueue.main.async {
                 self?.isHttpProxyRunning = false
                 self?.updateMenuState()
-                let exitCode = process.terminationStatus
-                self?.log(.info, "HTTP Proxy terminated with exit code: \(exitCode)")
+                self?.log(.info, "HTTP Proxy terminated")
             }
         }
         
@@ -210,7 +193,7 @@ extension InfraProxyManager {
             try httpProxyProcess?.run()
             isHttpProxyRunning = true
             updateMenuState()
-            self.log(.info, "HTTP Proxy started: \(configuration.httpProxyPath) -s localhost:\(configuration.localPort) -p \(configuration.httpProxyPort)")
+            self.log(.info, "HTTP Proxy started on port \(configuration.httpProxyPort)")
             showNotification(title: "HTTP Proxy Started", message: "Running on localhost:\(configuration.httpProxyPort)")
         } catch {
             self.log(.error, "Failed to start HTTP Proxy: \(error.localizedDescription)")
@@ -630,8 +613,6 @@ extension InfraProxyManager {
         proxyField.identifier = NSUserInterfaceItemIdentifier("proxyField")
         proxyField.isEditable = true
         proxyField.isSelectable = true
-        proxyField.isBezeled = true
-        proxyField.bezelStyle = .squareBezel
         proxyField.placeholderString = "teleport.example.com"
         contentView.addSubview(proxyField)
         settingsFields.append(proxyField)
@@ -649,8 +630,6 @@ extension InfraProxyManager {
         hostField.identifier = NSUserInterfaceItemIdentifier("hostField")
         hostField.isEditable = true
         hostField.isSelectable = true
-        hostField.isBezeled = true
-        hostField.bezelStyle = .squareBezel
         hostField.placeholderString = "myjumpserver.example.com"
         contentView.addSubview(hostField)
         settingsFields.append(hostField)
@@ -668,8 +647,6 @@ extension InfraProxyManager {
         portField.identifier = NSUserInterfaceItemIdentifier("portField")
         portField.isEditable = true
         portField.isSelectable = true
-        portField.isBezeled = true
-        portField.bezelStyle = .squareBezel
         portField.placeholderString = "2222"
         contentView.addSubview(portField)
         settingsFields.append(portField)
@@ -687,8 +664,6 @@ extension InfraProxyManager {
         pathField.identifier = NSUserInterfaceItemIdentifier("pathField")
         pathField.isEditable = true
         pathField.isSelectable = true
-        pathField.isBezeled = true
-        pathField.bezelStyle = .squareBezel
         contentView.addSubview(pathField)
         settingsFields.append(pathField)
         
@@ -734,8 +709,6 @@ extension InfraProxyManager {
         httpPortField.identifier = NSUserInterfaceItemIdentifier("httpPortField")
         httpPortField.isEditable = true
         httpPortField.isSelectable = true
-        httpPortField.isBezeled = true
-        httpPortField.bezelStyle = .squareBezel
         httpPortField.placeholderString = "8080"
         contentView.addSubview(httpPortField)
         settingsFields.append(httpPortField)
@@ -753,8 +726,6 @@ extension InfraProxyManager {
         httpPathField.identifier = NSUserInterfaceItemIdentifier("httpPathField")
         httpPathField.isEditable = true
         httpPathField.isSelectable = true
-        httpPathField.isBezeled = true
-        httpPathField.bezelStyle = .squareBezel
         httpPathField.placeholderString = "/usr/local/bin/hpts"
         contentView.addSubview(httpPathField)
         settingsFields.append(httpPathField)
