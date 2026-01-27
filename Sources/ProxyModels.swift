@@ -1,6 +1,21 @@
 import Foundation
 
-// MARK: - Service Model
+// MARK: - Teleport Configuration
+struct TeleportConfiguration {
+    var teleportProxy: String = "teleport.example.com"
+    var jumpboxHost: String = "myjumpserver.example.com"
+    var localPort: String = "2222"
+    var tshPath: String = "/Applications/tsh.app/Contents/MacOS/tsh"
+}
+
+// MARK: - HTTP Proxy Configuration
+struct HttpProxyConfiguration {
+    var enabled: Bool = false
+    var port: String = "8080"
+    var path: String = "/usr/local/bin/hpts"
+}
+
+// MARK: - Launchctl Service Model
 struct LaunchctlService: Codable, Identifiable, Equatable {
     let id: UUID
     var name: String
@@ -84,8 +99,11 @@ enum ServiceStatus: Equatable {
 
 // MARK: - App Configuration
 struct AppConfiguration {
+    var teleport = TeleportConfiguration()
+    var httpProxy = HttpProxyConfiguration()
     var services: [LaunchctlService] = []
     var showNotifications: Bool = true
+    var killExistingProcesses: Bool = false
 }
 
 // MARK: - Log Entry Model
@@ -103,7 +121,15 @@ struct LogEntry {
 }
 
 // MARK: - UserDefaults Keys
-extension UserDefaults {
-    static let servicesKey = "launchctlServices"
-    static let showNotificationsKey = "showNotifications"
+struct ConfigKeys {
+    static let teleportProxy = "teleportProxy"
+    static let jumpboxHost = "jumpboxHost"
+    static let localPort = "localPort"
+    static let tshPath = "tshPath"
+    static let httpProxyEnabled = "httpProxyEnabled"
+    static let httpProxyPort = "httpProxyPort"
+    static let httpProxyPath = "httpProxyPath"
+    static let killExistingProcesses = "killExistingProcesses"
+    static let showNotifications = "showNotifications"
+    static let launchctlServices = "launchctlServices"
 }
