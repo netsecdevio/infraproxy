@@ -6,6 +6,8 @@ struct TeleportConfiguration {
     var jumpboxHost: String = "myjumpserver.example.com"
     var localPort: String = "2222"
     var tshPath: String = "/Applications/tsh.app/Contents/MacOS/tsh"
+    var keepAliveEnabled: Bool = false
+    var keepAliveInterval: Int = 60
 }
 
 // MARK: - HTTP Proxy Configuration
@@ -126,6 +128,8 @@ struct ConfigKeys {
     static let jumpboxHost = "jumpboxHost"
     static let localPort = "localPort"
     static let tshPath = "tshPath"
+    static let teleportKeepAliveEnabled = "teleportKeepAliveEnabled"
+    static let teleportKeepAliveInterval = "teleportKeepAliveInterval"
     static let httpProxyEnabled = "httpProxyEnabled"
     static let httpProxyPort = "httpProxyPort"
     static let httpProxyPath = "httpProxyPath"

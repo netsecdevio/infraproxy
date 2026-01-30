@@ -556,6 +556,7 @@ class InfraProxyManager: NSObject {
                !configuration.teleport.jumpboxHost.isEmpty &&
                !configuration.teleport.localPort.isEmpty &&
                !configuration.teleport.tshPath.isEmpty &&
+               (!configuration.teleport.keepAliveEnabled || configuration.teleport.keepAliveInterval > 0) &&
                Int(configuration.teleport.localPort) != nil &&
                Int(configuration.teleport.localPort)! > 0 &&
                Int(configuration.teleport.localPort)! < 65536
@@ -585,9 +586,16 @@ class InfraProxyManager: NSObject {
     internal func startSocksProcess() {
         log(.info, "Already logged in, starting SOCKS directly")
 
+        let keepAliveOptions: String
+        if configuration.teleport.keepAliveEnabled {
+            keepAliveOptions = " -o ServerAliveInterval=\(configuration.teleport.keepAliveInterval) -o ServerAliveCountMax=3"
+        } else {
+            keepAliveOptions = ""
+        }
+
         socksProcess = Process()
         socksProcess?.launchPath = "/bin/zsh"
-        socksProcess?.arguments = ["-l", "-c", "\(configuration.teleport.tshPath) ssh -A -N -D \(configuration.teleport.localPort) \(configuration.teleport.jumpboxHost)"]
+        socksProcess?.arguments = ["-l", "-c", "\(configuration.teleport.tshPath) ssh -A -N -D \(configuration.teleport.localPort)\(keepAliveOptions) \(configuration.teleport.jumpboxHost)"]
 
         startProcessWithMonitoring()
     }

@@ -23,6 +23,13 @@ extension InfraProxyManager {
         if let path = defaults.string(forKey: ConfigKeys.tshPath) {
             configuration.teleport.tshPath = path
         }
+        configuration.teleport.keepAliveEnabled = defaults.bool(forKey: ConfigKeys.teleportKeepAliveEnabled)
+        if defaults.object(forKey: ConfigKeys.teleportKeepAliveInterval) != nil {
+            let interval = defaults.integer(forKey: ConfigKeys.teleportKeepAliveInterval)
+            configuration.teleport.keepAliveInterval = max(5, interval)
+        } else {
+            configuration.teleport.keepAliveInterval = 60
+        }
 
         // Load HTTP proxy settings
         if let httpPort = defaults.string(forKey: ConfigKeys.httpProxyPort) {
@@ -65,6 +72,8 @@ extension InfraProxyManager {
         defaults.set(configuration.teleport.jumpboxHost, forKey: ConfigKeys.jumpboxHost)
         defaults.set(configuration.teleport.localPort, forKey: ConfigKeys.localPort)
         defaults.set(configuration.teleport.tshPath, forKey: ConfigKeys.tshPath)
+        defaults.set(configuration.teleport.keepAliveEnabled, forKey: ConfigKeys.teleportKeepAliveEnabled)
+        defaults.set(configuration.teleport.keepAliveInterval, forKey: ConfigKeys.teleportKeepAliveInterval)
 
         // Save HTTP proxy settings
         defaults.set(configuration.httpProxy.enabled, forKey: ConfigKeys.httpProxyEnabled)
@@ -536,6 +545,28 @@ extension InfraProxyManager {
         contentView.addSubview(browseButton)
 
         yPosition -= 40
+
+        let keepAliveCheckbox = NSButton(checkboxWithTitle: "Send keep-alives to prevent Teleport idle timeout", target: nil, action: nil)
+        keepAliveCheckbox.frame = NSRect(x: 20, y: yPosition, width: 400, height: 20)
+        keepAliveCheckbox.state = configuration.teleport.keepAliveEnabled ? .on : .off
+        keepAliveCheckbox.identifier = NSUserInterfaceItemIdentifier("keepAliveCheckbox")
+        contentView.addSubview(keepAliveCheckbox)
+
+        yPosition -= 28
+
+        let keepAliveIntervalLabel = NSTextField(labelWithString: "Keep-alive interval (sec):")
+        keepAliveIntervalLabel.frame = NSRect(x: 20, y: yPosition, width: 200, height: 20)
+        contentView.addSubview(keepAliveIntervalLabel)
+
+        let keepAliveIntervalField = NSTextField()
+        keepAliveIntervalField.frame = NSRect(x: 220, y: yPosition, width: 80, height: 22)
+        keepAliveIntervalField.stringValue = "\(configuration.teleport.keepAliveInterval)"
+        keepAliveIntervalField.identifier = NSUserInterfaceItemIdentifier("keepAliveIntervalField")
+        keepAliveIntervalField.placeholderString = "60"
+        contentView.addSubview(keepAliveIntervalField)
+        settingsFields.append(keepAliveIntervalField)
+
+        yPosition -= 32
 
         // === HTTP PROXY SECTION ===
         let separatorLine1 = NSBox()
@@ -1039,6 +1070,15 @@ extension InfraProxyManager {
         }
         if let pathField = settingsFields.first(where: { $0.identifier?.rawValue == "pathField" }) {
             configuration.teleport.tshPath = pathField.stringValue
+        }
+        if let keepAliveCheckbox = settingsWindow?.contentView?.subviews.first(where: {
+            ($0 as? NSButton)?.identifier?.rawValue == "keepAliveCheckbox"
+        }) as? NSButton {
+            configuration.teleport.keepAliveEnabled = keepAliveCheckbox.state == .on
+        }
+        if let keepAliveIntervalField = settingsFields.first(where: { $0.identifier?.rawValue == "keepAliveIntervalField" }) {
+            let intervalValue = Int(keepAliveIntervalField.stringValue) ?? configuration.teleport.keepAliveInterval
+            configuration.teleport.keepAliveInterval = max(5, intervalValue)
         }
 
         // Save HTTP proxy settings
