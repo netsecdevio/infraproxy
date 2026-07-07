@@ -84,9 +84,9 @@ cat > InfraProxy.app/Contents/Info.plist << EOF
     <key>CFBundleName</key>
     <string>InfraProxy</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.2.0</string>
+    <string>2.3.0</string>
     <key>CFBundleVersion</key>
-    <string>3</string>
+    <string>4</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.5</string>
     <key>LSUIElement</key>

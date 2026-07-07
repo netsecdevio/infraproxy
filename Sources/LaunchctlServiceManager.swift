@@ -93,6 +93,26 @@ class LaunchctlServiceManager {
         }
     }
 
+    // MARK: - Disable / Enable Auto-Start
+
+    /// Prevents the service from starting automatically at login.
+    /// Uses: launchctl disable gui/<uid>/<label>
+    func disableAutoStart(service: LaunchctlService, completion: @escaping (Result<Void, LaunchctlError>) -> Void) {
+        let uid = getuid()
+        executeCommand(arguments: ["disable", "gui/\(uid)/\(service.launchctlLabel)"]) { result in
+            completion(result)
+        }
+    }
+
+    /// Re-enables automatic start at login.
+    /// Uses: launchctl enable gui/<uid>/<label>
+    func enableAutoStart(service: LaunchctlService, completion: @escaping (Result<Void, LaunchctlError>) -> Void) {
+        let uid = getuid()
+        executeCommand(arguments: ["enable", "gui/\(uid)/\(service.launchctlLabel)"]) { result in
+            completion(result)
+        }
+    }
+
     // MARK: - Restart Service
     /// Restarts a launchctl service (stop then start)
     func restart(service: LaunchctlService, completion: @escaping (Result<Void, LaunchctlError>) -> Void) {

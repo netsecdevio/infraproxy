@@ -202,7 +202,11 @@ class InfraProxyManager: NSObject {
 
         menu.addItem(NSMenuItem.separator())
 
-        // Settings and logs
+        // Settings, logs, and about
+        let aboutItem = NSMenuItem(title: "About InfraProxy", action: #selector(showAbout), keyEquivalent: "")
+        aboutItem.target = self
+        menu.addItem(aboutItem)
+
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
@@ -271,6 +275,26 @@ class InfraProxyManager: NSObject {
             descItem.isEnabled = false
             submenu.addItem(descItem)
         }
+
+        if service.port != nil {
+            submenu.addItem(NSMenuItem.separator())
+            let testItem = NSMenuItem(title: "Test Port...", action: #selector(testServiceAction(_:)), keyEquivalent: "")
+            testItem.representedObject = service
+            testItem.target = self
+            submenu.addItem(testItem)
+        }
+
+        submenu.addItem(NSMenuItem.separator())
+
+        let disableItem = NSMenuItem(title: "Disable Auto-Start", action: #selector(disableServiceAutoStartAction(_:)), keyEquivalent: "")
+        disableItem.representedObject = service
+        disableItem.target = self
+        submenu.addItem(disableItem)
+
+        let enableItem = NSMenuItem(title: "Enable Auto-Start", action: #selector(enableServiceAutoStartAction(_:)), keyEquivalent: "")
+        enableItem.representedObject = service
+        enableItem.target = self
+        submenu.addItem(enableItem)
 
         submenuItem.submenu = submenu
         menu.addItem(submenuItem)

@@ -1221,6 +1221,76 @@ extension InfraProxyManager {
             }
         }
     }
+
+    // MARK: - About
+
+    @objc func showAbout() {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.2.0"
+        let alert = NSAlert()
+        alert.messageText = "InfraProxy"
+        alert.informativeText = """
+        Version \(version)
+
+        Menu bar utility for managing Teleport SOCKS proxies, HTTP proxies, and launchctl services.
+        """
+        alert.alertStyle = .informational
+        alert.icon = NSApp.applicationIconImage
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
+    // MARK: - Service Test & Auto-Start
+
+    @objc func testServiceAction(_ sender: NSMenuItem) {
+        guard let service = sender.representedObject as? LaunchctlService else { return }
+        guard let port = service.port else { return }
+
+        let pids = checkPortContentionForPort("\(port)")
+        let alert = NSAlert()
+        alert.messageText = "\(service.name) — Port \(port)"
+
+        if pids.isEmpty {
+            alert.informativeText = "Nothing is listening on port \(port). The service may not be running correctly."
+            alert.alertStyle = .warning
+        } else {
+            alert.informativeText = "✅ Port \(port) is active (PID\(pids.count > 1 ? "s" : ""): \(pids.map(String.init).joined(separator: ", ")))."
+            alert.alertStyle = .informational
+        }
+
+        alert.runModal()
+    }
+
+    @objc func disableServiceAutoStartAction(_ sender: NSMenuItem) {
+        guard let service = sender.representedObject as? LaunchctlService else { return }
+        log(.info, "Disabling auto-start for \(service.name)")
+
+        launchctlManager.disableAutoStart(service: service) { [weak self] result in
+            switch result {
+            case .success:
+                self?.log(.info, "Auto-start disabled for \(service.name)")
+                self?.showNotification(title: "Auto-Start Disabled", message: "\(service.name) will not start automatically at login.")
+            case .failure(let error):
+                self?.log(.error, "Failed to disable auto-start for \(service.name): \(error.localizedDescription)")
+                self?.showError(message: "Failed to disable auto-start: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    @objc func enableServiceAutoStartAction(_ sender: NSMenuItem) {
+        guard let service = sender.representedObject as? LaunchctlService else { return }
+        log(.info, "Enabling auto-start for \(service.name)")
+
+        launchctlManager.enableAutoStart(service: service) { [weak self] result in
+            switch result {
+            case .success:
+                self?.log(.info, "Auto-start enabled for \(service.name)")
+                self?.showNotification(title: "Auto-Start Enabled", message: "\(service.name) will start automatically at login.")
+            case .failure(let error):
+                self?.log(.error, "Failed to enable auto-start for \(service.name): \(error.localizedDescription)")
+                self?.showError(message: "Failed to enable auto-start: \(error.localizedDescription)")
+            }
+        }
+    }
 }
 
 // MARK: - NSTableViewDataSource
