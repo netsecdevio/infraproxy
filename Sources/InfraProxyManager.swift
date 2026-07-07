@@ -1034,10 +1034,21 @@ class InfraProxyManager: NSObject {
 
     internal func log(_ level: LogEntry.LogLevel, _ message: String) {
         let entry = LogEntry(timestamp: Date(), level: level, message: message)
-        logEntries.append(entry)
 
-        if logEntries.count > maxLogEntries {
-            logEntries.removeFirst(logEntries.count - maxLogEntries)
+        let update = {
+            self.logEntries.append(entry)
+            if self.logEntries.count > self.maxLogEntries {
+                self.logEntries.removeFirst(self.logEntries.count - self.maxLogEntries)
+            }
+            if self.logsWindow != nil {
+                self.updateLogsWindow()
+            }
+        }
+
+        if Thread.isMainThread {
+            update()
+        } else {
+            DispatchQueue.main.async { update() }
         }
 
         print("[\(level.rawValue)] \(message)")

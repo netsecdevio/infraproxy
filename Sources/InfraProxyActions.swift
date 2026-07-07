@@ -1141,6 +1141,7 @@ extension InfraProxyManager {
         )
         logsWindow?.title = "InfraProxy Logs"
         logsWindow?.center()
+        logsWindow?.isReleasedWhenClosed = false
 
         let scrollView = NSScrollView()
         scrollView.frame = NSRect(x: 0, y: 40, width: 800, height: 560)
@@ -1148,8 +1149,12 @@ extension InfraProxyManager {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
 
-        let textView = NSTextView()
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 560))
         textView.isEditable = false
+        textView.isVerticallyResizable = true
+        textView.autoresizingMask = .width
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
         textView.textContainer?.widthTracksTextView = false
         textView.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
@@ -1167,7 +1172,7 @@ extension InfraProxyManager {
         logsWindow?.contentView?.addSubview(exportButton)
     }
 
-    private func updateLogsWindow() {
+    internal func updateLogsWindow() {
         guard let scrollView = logsWindow?.contentView?.subviews.first(where: { $0 is NSScrollView }) as? NSScrollView,
               let textView = scrollView.documentView as? NSTextView else { return }
 
