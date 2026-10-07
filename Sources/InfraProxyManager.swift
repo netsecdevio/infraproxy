@@ -5,6 +5,7 @@ import UserNotifications
 class InfraProxyManager: NSObject {
     internal var dashboardWindow: NSWindow?
     internal let operations = OperationsModel()
+    internal let appUpdater = AppUpdater()
     private var statusItem: NSStatusItem?
     private var menu: NSMenu!
 
@@ -55,6 +56,7 @@ class InfraProxyManager: NSObject {
         super.init()
         loadConfiguration()
         setupMenuBar()
+        appUpdater.start()
         operations.manager = self
         operations.start()
         startStatusRefresh()
@@ -218,6 +220,7 @@ class InfraProxyManager: NSObject {
         let aboutItem = NSMenuItem(title: "About InfraProxy", action: #selector(showAbout), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
+        menu.addItem(appUpdater.menuItem())
 
         let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: ",")
         settingsItem.target = self

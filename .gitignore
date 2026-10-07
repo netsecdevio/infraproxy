@@ -51,3 +51,10 @@ fastlane/test_output
 .DS_Store
 InfraProxy.app.tar.gz
 InfraProxy.app/*
+
+# Downloaded updater SDK and generated release artifacts
+Vendor/Sparkle/
+dist/
+InfraProxy.zip
+InfraProxy-*.dmg
+InfraProxy-*.dmg.sha256

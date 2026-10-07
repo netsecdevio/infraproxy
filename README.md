@@ -6,7 +6,13 @@ A macOS menu bar application for managing Identity Aware (IA) Proxy connections 
 ![Swift](https://img.shields.io/badge/Swift-5.7%2B-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-## New in 2.5.0
+## In-app updates (2.6.0+)
+
+Use **Check for Updates…** in the menu bar or **Connection Dashboard & GCP → Updates**. InfraProxy checks daily and offers signed updates for installation and relaunch. Automatic checks can be disabled in the Updates tab. Install v2.6.0 once to enable this on older installations.
+
+Release maintainers: see [UPDATING.md](UPDATING.md) for the signed-feed publishing workflow.
+
+## Google Cloud integration
 
 Open **Connection Dashboard & GCP… → Google Cloud**. InfraProxy discovers installed gcloud accounts and accessible projects automatically. Use **Sign in / Add account** or **Reauthenticate** to authenticate in your browser with the methods offered by Google or your organization, including supported passkeys and hardware security keys.
 
@@ -146,7 +152,7 @@ Enable detailed logging:
 ### Building
 ```bash
 # Direct compilation
-swiftc -o InfraProxy Sources/*.swift -framework Cocoa -framework UserNotifications
+./build.sh
 
 # Targeted regression checks
 bash Tests/run.sh

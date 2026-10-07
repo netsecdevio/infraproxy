@@ -1,8 +1,6 @@
 import Cocoa
 import SwiftUI
 
-// Commands run off the UI thread, with output drained before waiting and a bounded lifetime.
-
 struct VMInstance: Decodable, Identifiable {
     let name: String
     let zone: String
@@ -105,6 +103,7 @@ final class OperationsModel: ObservableObject {
 
 struct OperationsView: View {
     @ObservedObject var model: OperationsModel
+    let updater: AppUpdater
     var body: some View {
         TabView {
             VStack(alignment: .leading, spacing: 18) {
@@ -135,6 +134,7 @@ struct OperationsView: View {
                 Text("Local accepted TCP sockets, refreshed every 5 seconds. HTTP-to-SOCKS forwarding appears on both listeners. These are not cluster-wide Teleport SSH sessions.").font(.caption).foregroundStyle(.secondary)
             }.padding(24).tabItem { Label("Connections", systemImage: "network") }
             GoogleCloudView(model: model.cloud).tabItem { Label("Google Cloud", systemImage: "cloud") }
+            UpdatesView(updater: updater).tabItem { Label("Updates", systemImage: "arrow.down.circle") }
         }.frame(minWidth: 780, minHeight: 520)
     }
 }
@@ -144,7 +144,7 @@ extension InfraProxyManager {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 840, height: 600), styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
             window.title = "InfraProxy — Operations"
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: OperationsView(model: operations))
+            window.contentView = NSHostingView(rootView: OperationsView(model: operations, updater: appUpdater))
             window.center()
             dashboardWindow = window
         }

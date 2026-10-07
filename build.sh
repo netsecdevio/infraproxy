@@ -1,11 +1,15 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+cd "$(dirname "$0")"
 
 # Configuration
 SIGNING_IDENTITY="Developer ID Application: Doug Dowenr (J77629PP5S)"
 KEYCHAIN_PROFILE="InfraProxy"
 BUNDLE_ID="com.dynadobe.infraproxy"
 ENTITLEMENTS="infraproxy.entitlements"
+APP_VERSION="2.6.0"
+APP_BUILD="7"
+SPARKLE_FEED="https://github.com/netsecdevio/infraproxy/releases/latest/download/appcast.xml"
 
 # Parse arguments
 NOTARIZE=false
@@ -22,13 +26,15 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
+bash scripts/fetch-sparkle.sh
+SPARKLE_PUBLIC_KEY=$(cat Resources/sparkle-public-key.txt)
 echo "Building InfraProxy..."
 
 # Clean previous builds
 rm -rf InfraProxy.app
 
 # Compile Swift files directly
-swiftc -o InfraProxy \
+swiftc -target "$(uname -m)-apple-macosx15.5" -o InfraProxy \
     Sources/ProxyModels.swift \
     Sources/LaunchctlServiceManager.swift \
     Sources/InfraProxyManager.swift \
@@ -36,13 +42,19 @@ swiftc -o InfraProxy \
     Sources/Operations.swift \
     Sources/CloudOperations.swift \
     Sources/OperationsCommand.swift \
+    Sources/AppUpdater.swift \
     Sources/main.swift \
     -framework Cocoa \
-    -framework UserNotifications
+    -framework UserNotifications \
+    -F Vendor/Sparkle -framework Sparkle \
+    -Xlinker -rpath -Xlinker @executable_path/../Frameworks
 
 # Create app bundle
 mkdir -p InfraProxy.app/Contents/MacOS
 mkdir -p InfraProxy.app/Contents/Resources
+mkdir -p InfraProxy.app/Contents/Frameworks
+ditto Vendor/Sparkle/Sparkle.framework InfraProxy.app/Contents/Frameworks/Sparkle.framework
+cp Vendor/Sparkle/LICENSE InfraProxy.app/Contents/Resources/Sparkle-LICENSE.txt
 
 # Copy executable
 mv InfraProxy InfraProxy.app/Contents/MacOS/
@@ -89,9 +101,25 @@ cat > InfraProxy.app/Contents/Info.plist << EOF
     <key>CFBundleName</key>
     <string>InfraProxy</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.5.0</string>
+    <string>${APP_VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>6</string>
+    <string>${APP_BUILD}</string>
+    <key>SUFeedURL</key>
+    <string>${SPARKLE_FEED}</string>
+    <key>SUPublicEDKey</key>
+    <string>${SPARKLE_PUBLIC_KEY}</string>
+    <key>SURequireSignedFeed</key>
+    <true/>
+    <key>SUVerifyUpdateBeforeExtraction</key>
+    <true/>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
+    <key>SUAllowsAutomaticUpdates</key>
+    <false/>
+    <key>SUEnableSystemProfiling</key>
+    <false/>
     <key>LSMinimumSystemVersion</key>
     <string>15.5</string>
     <key>NSAppleEventsUsageDescription</key>
@@ -111,6 +139,16 @@ if [ "$NOTARIZE" = true ]; then
     echo ""
     echo "🔐 Signing app with hardened runtime..."
 
+    # Sign nested Sparkle helpers inside-out, retaining their required entitlements.
+    SPARKLE_ROOT="InfraProxy.app/Contents/Frameworks/Sparkle.framework/Versions/B"
+    for component in "$SPARKLE_ROOT/XPCServices/Downloader.xpc" \
+                     "$SPARKLE_ROOT/XPCServices/Installer.xpc" \
+                     "$SPARKLE_ROOT/Autoupdate" "$SPARKLE_ROOT/Updater.app" \
+                     "InfraProxy.app/Contents/Frameworks/Sparkle.framework"; do
+        codesign --force --options runtime --preserve-metadata=identifier,entitlements \
+            --sign "$SIGNING_IDENTITY" --timestamp "$component"
+    done
+
     # Sign the app with hardened runtime (required for notarization)
     codesign --force --options runtime \
         --entitlements "$ENTITLEMENTS" \
@@ -120,7 +158,7 @@ if [ "$NOTARIZE" = true ]; then
 
     # Verify the signature
     echo "🔍 Verifying signature..."
-    codesign --verify --verbose=2 InfraProxy.app
+    codesign --verify --deep --strict --verbose=2 InfraProxy.app
 
     # Create a zip for notarization
     echo "📦 Creating zip for notarization..."
