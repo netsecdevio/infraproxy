@@ -3,6 +3,8 @@ import Foundation
 import UserNotifications
 
 class InfraProxyManager: NSObject {
+    internal var dashboardWindow: NSWindow?
+    internal let operations = OperationsModel()
     private var statusItem: NSStatusItem?
     private var menu: NSMenu!
 
@@ -53,12 +55,18 @@ class InfraProxyManager: NSObject {
         super.init()
         loadConfiguration()
         setupMenuBar()
+        operations.manager = self
+        operations.start()
         startStatusRefresh()
         log(.info, "InfraProxy started")
     }
 
     deinit {
         stopStatusRefresh()
+    }
+
+    internal func updateExpiryTitle(_ title: String) {
+        statusItem?.button?.title = " " + title
     }
 
     // MARK: - Menu Bar Setup
@@ -80,6 +88,10 @@ class InfraProxyManager: NSObject {
 
     internal func rebuildMenu() {
         menu.removeAllItems()
+        let dashboard = NSMenuItem(title: "Connection Dashboard & GCP…", action: #selector(showDashboard), keyEquivalent: "d")
+        dashboard.target = self
+        menu.addItem(dashboard)
+        menu.addItem(.separator())
 
         // === TELEPORT SECTION ===
         let teleportHeader = NSMenuItem(title: "-- Teleport --", action: nil, keyEquivalent: "")

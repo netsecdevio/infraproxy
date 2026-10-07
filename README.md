@@ -6,6 +6,10 @@ A macOS menu bar application for managing Identity Aware (IA) Proxy connections 
 ![Swift](https://img.shields.io/badge/Swift-5.7%2B-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+## New in 2.4.0
+
+Open **Connection Dashboard & GCP…** from the menu bar for a live Teleport expiry countdown, per-port connection activity, and Google Cloud VM controls. See [release notes](RELEASE_NOTES.md) for setup, permissions, and monitoring scope.
+
 ## Features
 
 - **Menu Bar Integration**: Lightweight system tray application
@@ -139,6 +143,9 @@ Enable detailed logging:
 ```bash
 # Direct compilation
 swiftc -o InfraProxy Sources/*.swift -framework Cocoa -framework UserNotifications
+
+# Targeted regression checks
+bash Tests/run.sh
 
 # Using build script
 ./build.sh

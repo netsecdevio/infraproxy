@@ -1354,6 +1354,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         infraProxyManager = InfraProxyManager()
+        if CommandLine.arguments.contains("--dashboard") { infraProxyManager?.showDashboard() }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        infraProxyManager?.showDashboard()
+        return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {

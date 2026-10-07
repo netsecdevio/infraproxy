@@ -33,6 +33,7 @@ swiftc -o InfraProxy \
     Sources/LaunchctlServiceManager.swift \
     Sources/InfraProxyManager.swift \
     Sources/InfraProxyActions.swift \
+    Sources/Operations.swift \
     Sources/main.swift \
     -framework Cocoa \
     -framework UserNotifications
@@ -77,6 +78,8 @@ cat > InfraProxy.app/Contents/Info.plist << EOF
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
     <key>CFBundleExecutable</key>
     <string>InfraProxy</string>
     <key>CFBundleIdentifier</key>
@@ -84,11 +87,13 @@ cat > InfraProxy.app/Contents/Info.plist << EOF
     <key>CFBundleName</key>
     <string>InfraProxy</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.3.0</string>
+    <string>2.4.0</string>
     <key>CFBundleVersion</key>
-    <string>4</string>
+    <string>5</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.5</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>InfraProxy opens Google Cloud SSH connections in Terminal.</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSUserNotificationAlertStyle</key>
