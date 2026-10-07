@@ -34,6 +34,8 @@ swiftc -o InfraProxy \
     Sources/InfraProxyManager.swift \
     Sources/InfraProxyActions.swift \
     Sources/Operations.swift \
+    Sources/CloudOperations.swift \
+    Sources/OperationsCommand.swift \
     Sources/main.swift \
     -framework Cocoa \
     -framework UserNotifications
@@ -87,9 +89,9 @@ cat > InfraProxy.app/Contents/Info.plist << EOF
     <key>CFBundleName</key>
     <string>InfraProxy</string>
     <key>CFBundleShortVersionString</key>
-    <string>2.4.0</string>
+    <string>2.5.0</string>
     <key>CFBundleVersion</key>
-    <string>5</string>
+    <string>6</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.5</string>
     <key>NSAppleEventsUsageDescription</key>

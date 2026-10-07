@@ -2,35 +2,6 @@ import Cocoa
 import SwiftUI
 
 // Commands run off the UI thread, with output drained before waiting and a bounded lifetime.
-struct CommandResult {
-    let code: Int32
-    let output: String
-}
-enum OperationsCommand {
-    static func run(_ executable: String, _ arguments: [String], timeout: TimeInterval = 25) -> CommandResult {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        var environment = ProcessInfo.processInfo.environment
-        environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/local/google-cloud-sdk/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-        environment["CLOUDSDK_CORE_DISABLE_PROMPTS"] = "1"
-        process.environment = environment
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        process.standardInput = FileHandle.nullDevice
-        do {
-            try process.run()
-            let deadline = DispatchWorkItem { if process.isRunning { process.terminate() } }
-            DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
-            deadline.cancel()
-            return CommandResult(code: process.terminationStatus, output: String(decoding: data, as: UTF8.self))
-        } catch { return CommandResult(code: -1, output: error.localizedDescription) }
-    }
-    static func quote(_ value: String) -> String { "\u{27}" + value.replacingOccurrences(of: "\u{27}", with: "\u{27}\\\u{27}\u{27}") + "\u{27}" }
-}
 
 struct VMInstance: Decodable, Identifiable {
     let name: String
@@ -76,12 +47,7 @@ final class OperationsModel: ObservableObject {
     @Published var now = Date()
     @Published var connections: [ConnectionSnapshot] = []
     @Published var statsMessage = "Checking connections…"
-    @Published var project = UserDefaults.standard.string(forKey: "gcpProject") ?? ""
-    @Published var gcloudPath = UserDefaults.standard.string(forKey: "gcloudPath") ?? ["/usr/local/google-cloud-sdk/bin/gcloud", "/opt/homebrew/bin/gcloud", "/usr/local/bin/gcloud"].first(where: { FileManager.default.isExecutableFile(atPath: $0) }) ?? "/opt/homebrew/bin/gcloud"
-    @Published var instances: [VMInstance] = []
-    @Published var loadedProject = ""
-    @Published var cloudMessage = "Enter a project ID and refresh. Uses your existing gcloud login."
-    @Published var cloudBusy = false
+    let cloud = GoogleCloudModel()
     private var timer: Timer?
     private var refreshing = false
     private var ticks = 0
@@ -94,7 +60,7 @@ final class OperationsModel: ObservableObject {
             self.manager?.updateExpiryTitle(TeleportExpiry.label(self.expiry, now: self.now))
             self.ticks += 1
             if self.ticks % 5 == 0 { self.refreshStats() }
-            if self.ticks % 30 == 0, self.manager?.dashboardWindow?.isVisible == true, !self.loadedProject.isEmpty { self.refreshCloud() }
+            if self.ticks % 30 == 0, self.manager?.dashboardWindow?.isVisible == true, !self.cloud.project.isEmpty { self.cloud.refreshResources() }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
@@ -124,7 +90,7 @@ final class OperationsModel: ObservableObject {
                     if line == "TST=LISTEN" { listening = true }
                     if line == "TST=ESTABLISHED", endpoint.components(separatedBy: "->").first?.hasSuffix(":" + port) == true { sessions.append(endpoint) }
                 }
-                return ConnectionSnapshot(name: name, port: port, listening: listening, sessions: sessions, available: result.code == 0 || (result.code == 1 && result.output.isEmpty))
+                return ConnectionSnapshot(name: name, port: port, listening: listening, sessions: sessions, available: result.code == 0 || (result.code == 1 && result.output.isEmpty && result.diagnostic.isEmpty))
             }
             DispatchQueue.main.async {
                 self.expiry = expiry
@@ -134,58 +100,7 @@ final class OperationsModel: ObservableObject {
             }
         }
     }
-    func refreshCloud() {
-        guard !cloudBusy else { return }
-        let project = project.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !project.isEmpty else { cloudMessage = "Enter a GCP project ID."; instances = []; loadedProject = ""; return }
-        UserDefaults.standard.set(project, forKey: "gcpProject")
-        UserDefaults.standard.set(gcloudPath, forKey: "gcloudPath")
-        cloudBusy = true
-        cloudMessage = "Loading instances…"
-        let path = gcloudPath
-        DispatchQueue.global(qos: .utility).async {
-            let result = OperationsCommand.run(path, ["compute", "instances", "list", "--project=" + project, "--format=json", "--quiet"])
-            let rows = result.code == 0 ? try? JSONDecoder().decode([VMInstance].self, from: Data(result.output.utf8)) : nil
-            DispatchQueue.main.async {
-                self.cloudBusy = false
-                self.instances = rows ?? []
-                self.loadedProject = rows == nil ? "" : project
-                self.cloudMessage = rows.map { "\($0.count) instances · updated \(Date().formatted(date: .omitted, time: .standard))" } ?? "Unable to load instances: \(result.output.prefix(1200))"
-            }
-        }
-    }
-    func operate(_ action: String, instance: VMInstance) {
-        guard !cloudBusy, project.trimmingCharacters(in: .whitespacesAndNewlines) == loadedProject, !loadedProject.isEmpty else { return }
-        let project = loadedProject
-        if action == "stop" {
-            let alert = NSAlert()
-            alert.messageText = "Stop \(instance.name)?"
-            alert.informativeText = "Project: \(project)\nZone: \(instance.shortZone)\nThis interrupts workloads and active connections."
-            alert.addButton(withTitle: "Cancel")
-            alert.addButton(withTitle: "Stop Instance")
-            guard alert.runModal() == .alertSecondButtonReturn else { return }
-        }
-        let path = gcloudPath
-        if action == "ssh" {
-            let args = [path, "compute", "ssh", instance.name, "--project=" + project, "--zone=" + instance.shortZone, "--tunnel-through-iap"]
-            let command = args.map(OperationsCommand.quote).joined(separator: " ")
-            let escaped = command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-            var error: NSDictionary?
-            NSAppleScript(source: "tell application \"Terminal\"\nactivate\ndo script \"\(escaped)\"\nend tell")?.executeAndReturnError(&error)
-            cloudMessage = error.map { "Could not open Terminal: \($0)" } ?? "SSH opened in Terminal for \(instance.name)."
-            return
-        }
-        cloudBusy = true
-        cloudMessage = "\(action.capitalized) requested for \(instance.name)…"
-        DispatchQueue.global(qos: .utility).async {
-            let result = OperationsCommand.run(path, ["compute", "instances", action, instance.name, "--project=" + project, "--zone=" + instance.shortZone, "--quiet"], timeout: 180)
-            DispatchQueue.main.async {
-                self.cloudBusy = false
-                if result.code == 0 { self.refreshCloud() }
-                else { self.cloudMessage = "Operation failed or timed out; refresh to verify state. \(result.output.prefix(1200))" }
-            }
-        }
-    }
+
 }
 
 struct OperationsView: View {
@@ -219,23 +134,7 @@ struct OperationsView: View {
                 }
                 Text("Local accepted TCP sockets, refreshed every 5 seconds. HTTP-to-SOCKS forwarding appears on both listeners. These are not cluster-wide Teleport SSH sessions.").font(.caption).foregroundStyle(.secondary)
             }.padding(24).tabItem { Label("Connections", systemImage: "network") }
-            VStack(alignment: .leading, spacing: 14) {
-                Text("Google Cloud instances").font(.title2.bold())
-                TextField("GCP project ID", text: $model.project).disabled(model.cloudBusy)
-                TextField("Absolute path to gcloud", text: $model.gcloudPath).disabled(model.cloudBusy)
-                HStack { Button("Refresh", action: model.refreshCloud).disabled(model.cloudBusy); if model.cloudBusy { ProgressView().controlSize(.small) } }
-                Text(model.cloudMessage).font(.caption).textSelection(.enabled)
-                List(model.instances) { instance in
-                    HStack {
-                        VStack(alignment: .leading) { Text(instance.name).bold(); Text("\(instance.shortZone) · \(instance.status)").font(.caption).foregroundStyle(.secondary) }
-                        Spacer()
-                        Button("Start") { model.operate("start", instance: instance) }.disabled(instance.status != "TERMINATED")
-                        Button("Stop") { model.operate("stop", instance: instance) }.disabled(instance.status != "RUNNING")
-                        Button("Connect") { model.operate("ssh", instance: instance) }.disabled(instance.status != "RUNNING")
-                    }.padding(.vertical, 6)
-                }.disabled(model.cloudBusy || model.project.trimmingCharacters(in: .whitespacesAndNewlines) != model.loadedProject)
-                Text("Authenticate with gcloud auth login in Terminal. Connect opens SSH through IAP; IAM and firewall access are required. Status refreshes every 30 seconds while this window is open.").font(.caption).foregroundStyle(.secondary)
-            }.padding(24).tabItem { Label("Google Cloud", systemImage: "cloud") }
+            GoogleCloudView(model: model.cloud).tabItem { Label("Google Cloud", systemImage: "cloud") }
         }.frame(minWidth: 780, minHeight: 520)
     }
 }

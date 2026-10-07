@@ -1363,6 +1363,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        infraProxyManager?.operations.cloud.cancelLogin()
         infraProxyManager = nil
     }
 }

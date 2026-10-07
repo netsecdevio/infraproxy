@@ -6,9 +6,13 @@ A macOS menu bar application for managing Identity Aware (IA) Proxy connections 
 ![Swift](https://img.shields.io/badge/Swift-5.7%2B-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-## New in 2.4.0
+## New in 2.5.0
 
-Open **Connection Dashboard & GCP…** from the menu bar for a live Teleport expiry countdown, per-port connection activity, and Google Cloud VM controls. See [release notes](RELEASE_NOTES.md) for setup, permissions, and monitoring scope.
+Open **Connection Dashboard & GCP… → Google Cloud**. InfraProxy discovers installed gcloud accounts and accessible projects automatically. Use **Sign in / Add account** or **Reauthenticate** to authenticate in your browser with the methods offered by Google or your organization, including supported passkeys and hardware security keys.
+
+Choose a populated project and browse VMs, Storage, Cloud SQL, Kubernetes, Cloud Run, or VPC networks. VM start/stop and IAP SSH are available in the app; Cloud Console links open further project management, logs, IAM, and APIs. A Google Cloud CLI installation is required and detected automatically, with an install link and file picker when necessary.
+
+The dashboard also shows the Teleport credential-expiry countdown and per-port TCP sessions. See [release notes](RELEASE_NOTES.md) for setup and validation scope.
 
 ## Features
 

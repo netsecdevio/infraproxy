@@ -1,18 +1,23 @@
-# InfraProxy 2.4.0
+# InfraProxy 2.5.0
 
-- Adds a menu bar countdown to the configured Teleport proxy credential expiry, including explicit expired and unavailable states.
-- Adds **Connection Dashboard & GCP…** with live local listeners and accepted TCP sessions grouped by configured connection. Refreshes every five seconds, with a one-second countdown.
-- Adds Google Cloud project and CLI-path settings, instance status, start/stop operations, and SSH connections through IAP in Terminal. Stop requires confirmation naming the instance, project, and zone. VM status refreshes every 30 seconds while the dashboard is open.
-- Cloud operations use the existing gcloud identity and explicit project/zone. No cloud credentials are stored by InfraProxy.
+Google Cloud setup now discovers the installed CLI, saved accounts, accessible projects, and resources automatically. The Google Cloud tab replaces manual project and executable text fields with populated selectors.
 
-## Requirements and scope
+- **Sign in / Add account** starts Google's browser authorization flow and refreshes accounts, projects, and resources when it finishes.
+- **Reauthenticate** renews the selected account through a fresh browser flow. Google or the configured organization identity provider controls which passkeys, hardware security keys, passwords, and verification methods are available. InfraProxy does not collect those credentials.
+- **Cancel sign-in** cancels an unfinished login. Login output containing authorization URLs or codes is not displayed or logged by InfraProxy.
+- Browse VM instances, Storage buckets, Cloud SQL instances, Kubernetes clusters, Cloud Run services, and VPC networks. Cloud Console links open the selected project and account for resource management, project overview, logs, IAM, and enabled APIs.
+- VM power controls and IAP SSH explicitly use the selected account, project, and zone. Switching accounts or projects clears old resource results. Other resource categories are read-only.
+- Google Cloud CLI installation is detected automatically. If it is missing, the app offers the official install page and a file picker for an existing installation. Credentials remain managed by the CLI; the app remembers only selections and the executable path.
+- Existing Teleport expiry monitoring and per-port TCP session statistics are retained.
 
-Install and authenticate the Google Cloud CLI (`gcloud auth login`), then enter the project ID and absolute CLI path in the Google Cloud tab. Compute Engine permissions are required for listing and power operations; SSH through IAP additionally requires the appropriate IAP/SSH permissions and firewall rules. macOS may ask to allow InfraProxy to control Terminal.
+## Usage
 
-The timer reflects Teleport certificate validity, not a guarantee of when an established tunnel will disconnect. Local TCP sessions are not cluster-wide Teleport sessions; HTTP-to-SOCKS forwarding appears on both listeners. Port-based observations can include another process occupying a configured port. GCP SSH windows are owned by Terminal and are not counted as local proxy sessions.
+Open **Connection Dashboard & GCP… → Google Cloud**. Existing gcloud accounts and projects populate automatically. For a new account, choose **Sign in / Add account**, complete the browser flow, and select a discovered project. For an expired login, choose **Reauthenticate**. Refresh tokens are otherwise managed by gcloud.
+
+The CLI is still required. Account and project selection in InfraProxy does not change the active gcloud account or project for other tools. Existing organization login configuration is honored. Hardware-key and passkey availability depends on the Google/organization account and browser configuration. Resource visibility depends on IAM access and enabled APIs; the app reports discovery errors instead of displaying an empty success result. No service APIs are explicitly enabled by InfraProxy.
 
 ## Validation
 
-- Native macOS build and targeted Swift tests: profile matching, fractional expiry, missing and expired credentials, countdown arithmetic, shell quoting, subprocess output draining, timeout, executable failure, and GCP JSON decoding.
-- Live Teleport status parsing and read-only GCP instance listing checked locally.
-- VM start/stop and interactive IAP SSH were not exercised against production workloads.
+- Native build and regression tests cover discovery, account/project scoping, account switching, login completion/failure, authorization-output suppression, missing CLI, malformed data, resource parsing, command cancellation, and separate stdout/stderr handling.
+- Live read-only account/project discovery and all six resource-list commands verified. Populated VM and Cloud Run views inspected in the native UI.
+- Real passkey/security-key authentication and production VM start/stop were not performed during validation; authentication lifecycle and operation arguments were tested with a simulated CLI.
