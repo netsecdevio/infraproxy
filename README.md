@@ -1,6 +1,6 @@
 # infravibe
 
-Formerly InfraProxy. Published releases still use the `InfraProxy.app` bundle and `infraproxy` cask token while the rebrand is in development. Existing bundle identifiers and settings paths are retained for upgrade compatibility.
+Formerly InfraProxy. Published releases still use the `InfraProxy.app` bundle  while the rebrand is in development. Existing bundle identifiers and settings paths are retained for upgrade compatibility.
 
 ## Contributing
 
@@ -103,7 +103,8 @@ The dashboard also shows the Teleport credential-expiry countdown and per-port T
 
 ```bash
 brew tap netsecdevio/infravibe https://github.com/netsecdevio/infravibe
-brew install --cask netsecdevio/infravibe/infraproxy
+brew trust --cask netsecdevio/infravibe/infravibe
+brew install --cask netsecdevio/infravibe/infravibe
 ```
 
 The cask downloads the same signed, notarized Universal 2 release and verifies
@@ -112,7 +113,7 @@ are installed separately. Use the in-app updater, or:
 
 ```bash
 brew update
-brew upgrade --cask --greedy infraproxy
+brew upgrade --cask --greedy infravibe
 ```
 
 An existing manually installed copy should be updated in-app; Homebrew will not
@@ -278,3 +279,11 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ---
 
 **Note**: This application requires appropriate network access and Teleport cluster permissions. Contact your system administrator for access credentials.
+
+### Homebrew tap trust and older installations
+
+Homebrew requires explicit trust for third-party package definitions. The command above trusts only the infravibe cask, not every current or future item in the tap. See [Homebrew Tap Trust](https://docs.brew.sh/Tap-Trust).
+
+If you previously added `netsecdevio/infraproxy`, add the new tap using the commands above. Only remove the old tap with `brew untap netsecdevio/infraproxy` after migrating any installed casks; do not force-remove a tap with installed packages.
+
+The cask is named `infravibe`. The current stable 2.7.0 artifact still contains `InfraProxy.app` and its original interface; the full application rebrand is not yet released. The signed bundle is intentionally not rewritten by Homebrew.
