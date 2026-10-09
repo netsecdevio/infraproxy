@@ -1,6 +1,6 @@
 cask "infravibe" do
-  version "2.7.0"
-  sha256 "eb1bacca882f709f26506a1237e693e5cb0d7b80640b4008204924798b3c2f6a"
+  version "2.8.0"
+  sha256 "5c3b7067ec0093593408b6ad8ba588df6797d178c2698f7ddf83d1407708b0d0"
 
   url "https://github.com/netsecdevio/infravibe/releases/download/v#{version}/InfraProxy-#{version}.dmg"
   name "infravibe"
