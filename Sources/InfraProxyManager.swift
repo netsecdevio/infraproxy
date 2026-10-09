@@ -1,8 +1,11 @@
 import Cocoa
 import Foundation
 import UserNotifications
+import SwiftUI
 
-class InfraProxyManager: NSObject {
+class InfraProxyManager: NSObject, ObservableObject {
+    internal let remoteAccess = RemoteAccessModel()
+    private var menuPopover: NSPopover?
     internal var dashboardWindow: NSWindow?
     internal let operations = OperationsModel()
     internal let appUpdater = AppUpdater()
@@ -11,18 +14,18 @@ class InfraProxyManager: NSObject {
 
     // Teleport process management
     internal var socksProcess: Process?
-    internal var isRunning = false
+    @Published internal var isRunning = false
 
     // HTTP Proxy process management
     internal var httpProxyProcess: Process?
-    internal var isHttpProxyRunning = false
+    @Published internal var isHttpProxyRunning = false
 
     // Launchctl service management
     internal let launchctlManager = LaunchctlServiceManager()
     internal var serviceStatuses: [UUID: ServiceStatus] = [:]
 
     // Configuration
-    internal var configuration = AppConfiguration()
+    @Published internal var configuration = AppConfiguration()
 
     // Status refresh
     private var refreshTimer: Timer?
@@ -59,6 +62,7 @@ class InfraProxyManager: NSObject {
         appUpdater.start()
         operations.manager = self
         operations.start()
+        remoteAccess.start()
         startStatusRefresh()
         log(.info, "InfraProxy started")
     }
@@ -68,7 +72,7 @@ class InfraProxyManager: NSObject {
     }
 
     internal func updateExpiryTitle(_ title: String) {
-        statusItem?.button?.title = " " + title
+        statusItem?.button?.title = operations.expiry == nil ? "" : " " + (title.hasPrefix("Expired") ? "Expired" : title)
     }
 
     // MARK: - Menu Bar Setup
@@ -83,7 +87,39 @@ class InfraProxyManager: NSObject {
 
         menu = NSMenu()
         rebuildMenu()
-        statusItem?.menu = menu
+        statusItem?.button?.target = self
+        statusItem?.button?.action = #selector(togglePanel)
+        statusItem?.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
+    }
+
+    @objc internal func togglePanel() {
+        if NSApp.currentEvent?.type == .rightMouseUp { showAdvancedMenu(); return }
+        guard let button = statusItem?.button else { return }
+        if menuPopover?.isShown == true { closePanel(); return }
+        let panel = menuPopover ?? NSPopover()
+        panel.behavior = .transient
+        let host = NSHostingController(rootView: MenuBarPanel(manager: self, operations: operations, remote: remoteAccess))
+        // Keep AppKit in charge of the anchored frame when SwiftUI state changes.
+        host.sizingOptions = []
+        let size = NSSize(width: 400, height: 554)
+        host.view.frame = NSRect(origin: .zero, size: size)
+        panel.contentViewController = host
+        panel.contentSize = size
+        menuPopover = panel
+        operations.refreshStats()
+        remoteAccess.refresh()
+        panel.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        panel.contentViewController?.view.window?.makeKey()
+    }
+    internal func closePanel() { menuPopover?.performClose(nil) }
+    internal func showAdvancedMenu() {
+        closePanel()
+        guard let button = statusItem?.button else { return }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.minY), in: button)
+    }
+    internal func openDashboard(_ tab: DashboardTab) {
+        operations.tab = tab
+        showDashboard()
     }
 
     // MARK: - Dynamic Menu Generation

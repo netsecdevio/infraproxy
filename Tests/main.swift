@@ -125,3 +125,29 @@ let noSDK = GoogleCloudModel(defaults: preferences, sdkResolver: { _ in nil }, r
 noSDK.discover()
 assert(noSDK.sdkPath == nil && noSDK.message.contains("could not be found"))
 print("PASS: discovery, account/project scoping, deleted projects, automatic login refresh, account switching, power-action arguments, malformed data, expired auth, secret suppression, missing CLI, resource decoding, and separated diagnostics")
+
+let tailFixture = #"{"BackendState":"Running","Self":{"DNSName":"host.example.ts.net."},"Peer":{"a":{"ID":"a","HostName":"offline","Online":false},"b":{"ID":"b","HostName":"online","Online":true,"TailscaleIPs":["100.64.0.2"]}}}"#
+let tailStatus = try JSONDecoder().decode(TailStatus.self, from: Data(tailFixture.utf8))
+assert(tailStatus.connected && tailStatus.hostname == "host.example.ts.net")
+assert(tailStatus.peers.map(\.id) == ["b", "a"] && tailStatus.peers.last?.address == "")
+assert(RemoteCommands.port("3000", blocked: [1080]) == 3000)
+for port in ["0", "65536", "1080", "3000;touch /tmp/bad", "３０００"] { assert(RemoteCommands.port(port, blocked: [1080]) == nil) }
+assert(try! RemoteCommands.portInUse(#"{"TCP":{"8443":{}}}"#))
+assert(try! RemoteCommands.portInUse(#"{"Foreground":{"session":{"Web":{"host:8443":{}}}}}"#))
+assert(try! !RemoteCommands.portInUse(#"{"TCP":{"443":{}}}"#))
+assert(try! !RemoteCommands.portInUse("null"))
+assert(RemoteCommands.arguments(.tailscale, port: 3000) == ["serve", "--https=8443", "http://127.0.0.1:3000"])
+assert(RemoteCommands.arguments(.funnel, port: 3000).first == "funnel")
+assert(RemoteCommands.endpoint(in: "https://valid-name.trycloudflare.com \n", provider: .cloudflare)?.host == "valid-name.trycloudflare.com")
+assert(RemoteCommands.endpoint(in: "https://valid.trycloudflare.com.evil.test", provider: .cloudflare) == nil)
+assert(RemoteCommands.endpoint(in: "https://host.tail.ts.net:84430", provider: .tailscale) == nil)
+let ownedTunnel = SharedTunnel()
+ownedTunnel.start(executable: "/bin/sh", arguments: ["-c", "echo https://fixture-test.trycloudflare.com; echo Registered tunnel connection; exec sleep 30"], provider: .cloudflare)
+let readyDeadline = Date().addingTimeInterval(3)
+while !ownedTunnel.ready && Date() < readyDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+assert(ownedTunnel.running && ownedTunnel.ready && ownedTunnel.url != nil)
+ownedTunnel.stop()
+let stopDeadline = Date().addingTimeInterval(4)
+while ownedTunnel.running && Date() < stopDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+assert(!ownedTunnel.running && !ownedTunnel.ready && ownedTunnel.url == nil)
+print("PASS: Tailscale discovery, existing-share protection, safe port validation, provider arguments, URL validation, owned tunnel readiness and shutdown")

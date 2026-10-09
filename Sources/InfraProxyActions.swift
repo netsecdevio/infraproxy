@@ -1355,14 +1355,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         infraProxyManager = InfraProxyManager()
         if CommandLine.arguments.contains("--dashboard") { infraProxyManager?.showDashboard() }
+        if CommandLine.arguments.contains("--menu") { DispatchQueue.main.async { self.infraProxyManager?.togglePanel() } }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        infraProxyManager?.showDashboard()
+        if !flag { infraProxyManager?.togglePanel() }
         return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        infraProxyManager?.remoteAccess.shutdown()
         infraProxyManager?.operations.cloud.cancelLogin()
         infraProxyManager = nil
     }

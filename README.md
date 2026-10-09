@@ -6,15 +6,42 @@ A macOS menu bar application for managing Identity Aware (IA) Proxy connections 
 ![Swift](https://img.shields.io/badge/Swift-5.7%2B-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+## Menu panel and remote access
+
+Click the menu bar icon for the compact status panel: Teleport expiry, local
+listeners and TCP sessions, Tailscale connectivity, and cloud shortcuts. The
+**Appearance** control supports System, Light, and Dark themes. Right-click the
+icon for the existing advanced proxy and launch-service controls.
+
+Open **Tailscale** in the panel, or **Dashboard → Remote Access**, to discover your
+Mac and tailnet devices from the installed Tailscale client. Use **Open Tailscale**
+for provider sign-in and connection management.
+
+To share a local web application, enter its listening port and choose:
+
+- **Tailscale Serve**: private HTTPS within your tailnet, subject to tailnet policy.
+- **Tailscale Funnel**: public HTTPS, requiring Funnel permission in Tailscale.
+- **Cloudflare**: a temporary public Quick Tunnel using installed `cloudflared`.
+
+Sharing requires an explicit confirmation. InfraProxy owns only the foreground
+tunnels it starts; stopping one preserves other tunnels. Tailscale sharing uses
+HTTPS port 8443 and refuses an occupied port. Existing Cloudflare configuration
+files are preserved; use the Cloudflare console to manage named tunnels.
+Configured infrastructure proxy ports cannot be shared. These controls share
+local web services; they do not provide VibeTunnel's browser terminal.
+
+The menu design and sharing workflow draw inspiration from
+[VibeTunnel](https://github.com/amantus-ai/vibetunnel); see [notices](THIRD_PARTY_NOTICES.md).
+
 ## In-app updates (2.6.0+)
 
-Use **Check for Updates…** in the menu bar or **Connection Dashboard & GCP → Updates**. InfraProxy checks daily and offers signed updates for installation and relaunch. Automatic checks can be disabled in the Updates tab. Install v2.6.0 once to enable this on older installations.
+Use **Check for Updates…** in the menu bar or **Dashboard → Updates**. InfraProxy checks daily and offers signed updates for installation and relaunch. Automatic checks can be disabled in the Updates tab. Install v2.6.0 once to enable this on older installations.
 
 Release maintainers: see [UPDATING.md](UPDATING.md) for the signed-feed publishing workflow.
 
 ## Google Cloud integration
 
-Open **Connection Dashboard & GCP… → Google Cloud**. InfraProxy discovers installed gcloud accounts and accessible projects automatically. Use **Sign in / Add account** or **Reauthenticate** to authenticate in your browser with the methods offered by Google or your organization, including supported passkeys and hardware security keys.
+Open **Google Cloud** in the menu panel. InfraProxy discovers installed gcloud accounts and accessible projects automatically. Use **Sign in / Add account** or **Reauthenticate** to authenticate in your browser with the methods offered by Google or your organization, including supported passkeys and hardware security keys.
 
 Choose a populated project and browse VMs, Storage, Cloud SQL, Kubernetes, Cloud Run, or VPC networks. VM start/stop and IAP SSH are available in the app; Cloud Console links open further project management, logs, IAM, and APIs. A Google Cloud CLI installation is required and detected automatically, with an install link and file picker when necessary.
 

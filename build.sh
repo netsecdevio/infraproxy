@@ -8,7 +8,7 @@ KEYCHAIN_PROFILE="InfraProxy"
 BUNDLE_ID="com.dynadobe.infraproxy"
 ENTITLEMENTS="infraproxy.entitlements"
 APP_VERSION="2.6.0"
-APP_BUILD="7"
+APP_BUILD="8"
 SPARKLE_FEED="https://github.com/netsecdevio/infraproxy/releases/latest/download/appcast.xml"
 
 # Parse arguments
@@ -42,6 +42,8 @@ swiftc -target "$(uname -m)-apple-macosx15.5" -o InfraProxy \
     Sources/Operations.swift \
     Sources/CloudOperations.swift \
     Sources/OperationsCommand.swift \
+    Sources/MenuBarPanel.swift \
+    Sources/RemoteAccess.swift \
     Sources/AppUpdater.swift \
     Sources/main.swift \
     -framework Cocoa \
@@ -55,6 +57,8 @@ mkdir -p InfraProxy.app/Contents/Resources
 mkdir -p InfraProxy.app/Contents/Frameworks
 ditto Vendor/Sparkle/Sparkle.framework InfraProxy.app/Contents/Frameworks/Sparkle.framework
 cp Vendor/Sparkle/LICENSE InfraProxy.app/Contents/Resources/Sparkle-LICENSE.txt
+cp Resources/VibeTunnel-LICENSE.txt InfraProxy.app/Contents/Resources/
+cp THIRD_PARTY_NOTICES.md InfraProxy.app/Contents/Resources/
 
 # Copy executable
 mv InfraProxy InfraProxy.app/Contents/MacOS/

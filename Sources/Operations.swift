@@ -41,6 +41,7 @@ enum TeleportExpiry {
 
 final class OperationsModel: ObservableObject {
     weak var manager: InfraProxyManager?
+    @Published var tab: DashboardTab = .connections
     @Published var expiry: Date?
     @Published var now = Date()
     @Published var connections: [ConnectionSnapshot] = []
@@ -104,8 +105,10 @@ final class OperationsModel: ObservableObject {
 struct OperationsView: View {
     @ObservedObject var model: OperationsModel
     let updater: AppUpdater
+    @ObservedObject var manager: InfraProxyManager
+    @AppStorage("interfaceTheme") private var theme: InterfaceTheme = .system
     var body: some View {
-        TabView {
+        TabView(selection: $model.tab) {
             VStack(alignment: .leading, spacing: 18) {
                 HStack {
                     VStack(alignment: .leading) {
@@ -132,10 +135,11 @@ struct OperationsView: View {
                     }.padding(.vertical, 6)
                 }
                 Text("Local accepted TCP sockets, refreshed every 5 seconds. HTTP-to-SOCKS forwarding appears on both listeners. These are not cluster-wide Teleport SSH sessions.").font(.caption).foregroundStyle(.secondary)
-            }.padding(24).tabItem { Label("Connections", systemImage: "network") }
-            GoogleCloudView(model: model.cloud).tabItem { Label("Google Cloud", systemImage: "cloud") }
-            UpdatesView(updater: updater).tabItem { Label("Updates", systemImage: "arrow.down.circle") }
-        }.frame(minWidth: 780, minHeight: 520)
+            }.padding(24).tabItem { Label("Connections", systemImage: "network") }.tag(DashboardTab.connections)
+            RemoteAccessView(model: manager.remoteAccess, manager: manager).tabItem { Label("Remote Access", systemImage: "point.3.connected.trianglepath.dotted") }.tag(DashboardTab.remote)
+            GoogleCloudView(model: model.cloud).tabItem { Label("Google Cloud", systemImage: "cloud") }.tag(DashboardTab.cloud)
+            UpdatesView(updater: updater).tabItem { Label("Updates", systemImage: "arrow.down.circle") }.tag(DashboardTab.updates)
+        }.frame(minWidth: 780, minHeight: 560).preferredColorScheme(theme.colorScheme)
     }
 }
 extension InfraProxyManager {
@@ -144,7 +148,7 @@ extension InfraProxyManager {
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 840, height: 600), styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
             window.title = "InfraProxy — Operations"
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: OperationsView(model: operations, updater: appUpdater))
+            window.contentView = NSHostingView(rootView: OperationsView(model: operations, updater: appUpdater, manager: self))
             window.center()
             dashboardWindow = window
         }
