@@ -7,8 +7,8 @@ SIGNING_IDENTITY="Developer ID Application: Doug Dowenr (J77629PP5S)"
 KEYCHAIN_PROFILE="InfraProxy"
 BUNDLE_ID="com.dynadobe.infraproxy"
 ENTITLEMENTS="infraproxy.entitlements"
-APP_VERSION="2.8.0"
-APP_BUILD="11"
+APP_VERSION="2.9.0"
+APP_BUILD="12"
 SPARKLE_FEED="https://github.com/netsecdevio/infravibe/releases/latest/download/appcast.xml"
 
 # Parse arguments
@@ -43,7 +43,7 @@ swiftc -target "$ARCH-apple-macosx15.5" -o "$BUILD_SLICES/InfraProxy-$ARCH" \
     Sources/LaunchctlServiceManager.swift \
     Sources/InfraProxyManager.swift \
     Sources/InfraProxyActions.swift \
-    Sources/Operations.swift \
+    Sources/DevOps.swift Sources/Operations.swift \
     Sources/CloudOperations.swift \
     Sources/OperationsCommand.swift \
     Sources/MenuBarPanel.swift \

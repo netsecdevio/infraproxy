@@ -6,7 +6,7 @@ enum InterfaceTheme: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var colorScheme: ColorScheme? { self == .system ? nil : (self == .dark ? .dark : .light) }
 }
-enum DashboardTab: String { case connections, browser, remote, cloud, updates, advanced, agents, notifications, about }
+enum DashboardTab: String { case devops, connections, browser, remote, cloud, updates, advanced, agents, notifications, about }
 
 private struct PanelAction: View {
     let title: String
@@ -68,12 +68,8 @@ struct MenuBarPanel: View {
                 Divider()
                 RemoteOverview(browser: manager.browserDashboard, remote: remote) { open(.browser) }
                 Divider()
-                HStack {
-                    Label("DevOps", systemImage: "hammer")
-                    Spacer()
-                    Text("Not connected").foregroundStyle(.secondary)
-                }.font(.system(size: 12, weight: .medium))
-                Text("Pipelines, pull requests & issues")
+                DevOpsMenuSummary(model: operations.devops) { open(.devops) }
+                Text("Barklarm · Builds & monitoring alerts")
                     .font(.system(size: 10)).foregroundStyle(.secondary)
             }.padding(16)
             Divider()

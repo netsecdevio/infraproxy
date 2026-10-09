@@ -1,18 +1,14 @@
-# infravibe 2.8.0
+# infravibe 2.9.0
 
-InfraProxy is now infravibe, with the lowercase Cadence identity and a compact menu overview. Legacy bundle identifiers and the InfraProxy.app filename are retained for update compatibility.
+- Native DevOps monitoring adapted from Barklarm, with a compact live menu summary, a DevOps settings tab, configuration import, editing, and opt-in failure/recovery notifications.
+- Adapters for GitHub Actions, Azure DevOps, Bitbucket Pipelines, CCTray, Datadog, Sentry, New Relic, Opsgenie, Graylog and Grafana. Credentials are stored in macOS Keychain. Requests require HTTPS, retain certificate validation, and reject redirects.
+- Outbound now uses the same grouped settings layout as the other tabs and displays active TCP sessions under each proxy, with explicit empty and unavailable states.
+- Advanced settings now explain macOS Automation, Notifications, and Files and Folders permissions. Accessibility and Screen Recording are not required by current features.
 
-- Reconnectable browser terminal sessions, live output previews, session sidebar, and bounded exited-session history.
-- Standalone terminal sandbox: selected approved workspace access, isolated temporary home, no inherited credentials, and no network access. The default workspace is ~/infravibe-workspace. Approve additional repository folders locally in Dashboard.
-- SSH challenge authentication reads the target Mac's ~/.ssh/authorized_keys. This release accepts option-free Ed25519 entries only; restricted entries and unsupported algorithms are rejected. Changes invalidate browser sessions on the next authorization refresh.
-- Separate expiring agent tokens, local terminal-control approval, own-session authorization, revocation, and activity records through MCP.
-- Native session start/end notification settings and sound controls. Command-level events are not yet supported.
-- Homebrew cask renamed to infravibe with scoped trust instructions.
+All ten DevOps adapters have fixture coverage; GitHub Actions was also tested against a live public workflow. Other providers require your configuration and authenticated validation. Legacy provider API versions may display Unavailable. This release monitors status and links to providers; it does not implement full issue or pull-request management. Barklarm imports are independent copies, not a live synchronization with its desktop app.
 
-Terminal networking, attachment to existing host tmux sessions, native-terminal forwarding, the expanded command composer, and SPIFFE/SPIRE are not included. Network-enabled AI coding tools cannot run inside these restricted terminals yet. Provider tunnels remain available for inbound dashboard access and existing local web services.
+All bundled executables are Universal2. Existing standalone terminal sandbox and SSH authentication restrictions remain: workspace-only filesystem access, no terminal networking, option-free Ed25519 authorized_keys, and local approval for agent terminal control. SPIFFE/SPIRE remains deferred. Browser history is filesystem-protected, not encrypted by the app.
 
-All bundled executables are Universal2. The sandbox uses macOS sandbox-exec and fails closed if its executable or policy is unavailable; compatibility with unreleased macOS versions is not guaranteed. Authentication does not replace sandbox enforcement.
+Use Check for Updates to install and relaunch. Updating ends active terminals. Legacy InfraProxy.app and bundle identifiers remain for update compatibility.
 
-Use Check for Updates to install and relaunch. Updating ends active terminals. Exited history retains up to 100 sessions with 256 KiB output each; clear saved sessions to remove it. History is protected by filesystem permissions, not application-level encryption. Do not intentionally store credentials in terminal output.
-
-Known update quirk: provider discovery may show Tailscale as unavailable immediately after Sparkle relaunch. Quit and reopen infravibe normally to refresh discovery. This workaround was verified; the underlying relaunch issue remains under investigation.
+Known update quirk: if Tailscale discovery is unavailable immediately after Sparkle relaunch, quit and reopen infravibe normally. This workaround was verified previously; the underlying issue remains under investigation.

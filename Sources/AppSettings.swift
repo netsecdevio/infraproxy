@@ -58,6 +58,23 @@ struct AdvancedSettingsView: View {
                     Text("Used for Google Cloud IAP SSH connections. Browser terminals use your Mac user’s login shell.").font(.caption).foregroundStyle(.secondary)
                     if !terminalMessage.isEmpty { Text(terminalMessage).font(.caption).foregroundStyle(.secondary) }
                 }
+                SettingsSection("macOS permissions") {
+                    LabeledContent("Accessibility", value: "Not required")
+                    Text("infravibe does not control other apps through Accessibility.").font(.caption).foregroundStyle(.secondary)
+                    Divider()
+                    LabeledContent("Automation", value: "Requested when opening a native terminal")
+                    Text("Google Cloud SSH and the terminal Test button ask macOS to control Terminal or iTerm2. Approve only the terminal you use.").font(.caption).foregroundStyle(.secondary)
+                    Divider()
+                    LabeledContent("Notifications", value: "Manage in the Notifications tab")
+                    LabeledContent("Screen Recording", value: "Not required")
+                    Text("Session previews render terminal output; they do not capture your screen.").font(.caption).foregroundStyle(.secondary)
+                    Divider()
+                    LabeledContent("Files and Folders", value: "As needed for protected folders")
+                    Text("Approve session workspaces in Dashboard. macOS may separately ask for access to protected folders. Full Disk Access is not required. Workspace approval does not grant macOS privacy permissions.").font(.caption).foregroundStyle(.secondary)
+                    Button("Open System Settings") {
+                        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.systempreferences") { NSWorkspace.shared.open(url) }
+                    }
+                }
                 SettingsSection("Updates") {
                     LabeledContent("Update channel", value: "Stable releases")
                     Text("Receive signed, notarized production releases for Apple Silicon and Intel.").font(.caption).foregroundStyle(.secondary)

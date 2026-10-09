@@ -1,0 +1,3 @@
+[submodule "Vendor/barklarm"]
+	path = Vendor/barklarm
+	url = https://github.com/alvarolorentedev/barklarm-app.git

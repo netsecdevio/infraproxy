@@ -293,3 +293,14 @@ Homebrew requires explicit trust for third-party package definitions. The comman
 If you previously added `netsecdevio/infraproxy`, add the new tap using the commands above. Only remove the old tap with `brew untap netsecdevio/infraproxy` after migrating any installed casks; do not force-remove a tap with installed packages.
 
 The cask is named `infravibe`. The stable artifact retains the `InfraProxy.app` filename for updater compatibility; its interface is branded infravibe. The signed bundle is intentionally not rewritten by Homebrew.
+
+## DevOps monitoring
+
+Open **DevOps** in Operations, or click **DevOps** in the menu panel. infravibe
+includes native monitoring adapted from Barklarm: GitHub Actions, Azure DevOps,
+Bitbucket Pipelines, CCTray, Datadog, Sentry, New Relic, Opsgenie, Graylog and Grafana.
+Add read-only monitors or import a Barklarm JSON export and review it before
+starting. Credentials are saved in macOS Keychain. Checks run every 60 seconds;
+failure/recovery notifications are opt-in. HTTPS is required.
+
+See [integration details and validation limits](Vendor/BARKLARM.md).

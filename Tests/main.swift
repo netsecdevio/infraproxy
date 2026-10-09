@@ -214,3 +214,52 @@ assert(!authorizedStore.verify(publicKey: rawPublic.base64EncodedString(), signa
 assert(SessionWorkspaces.permits(SessionWorkspaces.defaultURL.path))
 assert(!SessionWorkspaces.permits(FileManager.default.homeDirectoryForCurrentUser.path))
 print("PASS: authorized_keys source, restricted-entry denial, revocation and workspace scope")
+
+// Barklarm adapter fixtures: failures and missing data must never become healthy.
+func monitorHealth(_ type: String, _ json: String, fields: [String:String] = [:]) throws -> DevOpsHealth {
+    try DevOpsAdapter.parse(Data(json.utf8), monitor: DevOpsMonitor(type: type, fields: fields)).health
+}
+assert(try! monitorHealth("githubAction", #"{"workflow_runs":[{"status":"completed","conclusion":"failure"}]}"#) == .failed)
+assert(try! monitorHealth("githubAction", #"{"workflow_runs":[{"status":"completed","conclusion":"cancelled"}]}"#) == .unknown)
+assert(try! monitorHealth("githubAction", #"{"workflow_runs":[{"status":"in_progress"}]}"#) == .running)
+assert(try! monitorHealth("azureDevOps", #"{"value":[{"state":"completed","result":"succeeded"}]}"#) == .healthy)
+assert(try! monitorHealth("bitbucket", #"{"values":[{"state":{"name":"COMPLETED","result":{"name":"STOPPED"}}}]}"#) == .unknown)
+assert(try! monitorHealth("bitbucket", #"{"values":[{"state":{"name":"COMPLETED","result":{"name":"FAILED"}}}]}"#) == .failed)
+assert(try! monitorHealth("datadogMonitor", #"{"overall_state":"Alert"}"#) == .failed)
+assert(try! monitorHealth("sentry", "[]") == .healthy)
+assert(try! monitorHealth("newRelic", #"{"violations":[{"id":1}]}"#) == .failed)
+assert(try! monitorHealth("opsgenie", #"{"data":{"status":"closed"}}"#) == .healthy)
+assert(try! monitorHealth("graylog", #"{"total":0}"#) == .healthy)
+assert(try! monitorHealth("grafana", #"{"status":"success","data":{"groups":[{"rules":[{"type":"alerting","state":"firing","health":"ok"}]}]}}"#) == .failed)
+assert(try! monitorHealth("grafana", #"{"status":"success","data":{"groups":[]}}"#) == .unknown)
+assert(try! monitorHealth("ccTray", #"<Projects><Project name="api" activity="Sleeping" lastBuildStatus="Success" /></Projects>"#) == .healthy)
+assert((try? monitorHealth("ccTray", #"<!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]><Projects/>"#)) == nil)
+assert((try? monitorHealth("sentry", "{}")) == nil)
+assert(DevOpsAdapter.url("http://example.com") == nil)
+assert(DevOpsAdapter.url("https://user:password@example.com") == nil)
+assert((try? DevOpsAdapter.request(DevOpsMonitor(type:"opsgenie", fields:["host":"evil.test", "identifier":"id", "apiKey":"fixture"]))) == nil)
+let barkImport = try DevOpsAdapter.imported(Data(#"{"observables":[{"type":"githubAction","owner":"example","repo":"repo","workflowId":42,"authToken":"fixture","muted":true}]}"#.utf8))
+assert(barkImport.count == 1 && barkImport[0].fields["workflowId"] == "42" && barkImport[0].muted)
+let barkRequest = try DevOpsAdapter.request(barkImport[0])
+assert(barkRequest.url?.host == "api.github.com" && barkRequest.value(forHTTPHeaderField:"Authorization") == "Bearer fixture")
+assert((try? DevOpsAdapter.imported(Data(#"{"observables":[{"type":"unknown"}]}"#.utf8))) == nil)
+print("PASS: ten Barklarm adapters, cancelled/unknown states, configuration import, HTTPS and credential destination restrictions, XML entity rejection")
+
+if ProcessInfo.processInfo.environment["INFRAVIBE_DEVOPS_LIVE_TEST"] == "1" {
+    var liveDone = false
+    var livePassed = false
+    Task { @MainActor in
+        do {
+            let monitor = DevOpsMonitor(type: "githubAction", fields: ["owner":"netsecdevio", "repo":"infravibe", "workflowId":"ci.yml"])
+            let data = try await DevOpsHTTP().fetch(DevOpsAdapter.request(monitor))
+            let result = try DevOpsAdapter.parse(data, monitor: monitor)
+            guard result.link?.host == "github.com" else { throw DevOpsError.invalidResponse }
+            print("PASS: live public GitHub Actions adapter: " + result.health.rawValue)
+            livePassed = true
+        } catch { print("FAIL: live public GitHub Actions adapter") }
+        liveDone = true
+    }
+    let deadline = Date().addingTimeInterval(35)
+    while !liveDone && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    assert(liveDone && livePassed)
+}

@@ -47,11 +47,13 @@ final class OperationsModel: ObservableObject {
     @Published var connections: [ConnectionSnapshot] = []
     @Published var statsMessage = "Checking connections…"
     let cloud = GoogleCloudModel()
+    let devops = DevOpsModel()
     private var timer: Timer?
     private var refreshing = false
     private var ticks = 0
     deinit { timer?.invalidate() }
     func start() {
+        if UserDefaults.standard.bool(forKey: "devOpsConfigured") { devops.load() }
         refreshStats()
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -109,47 +111,22 @@ struct OperationsView: View {
     @AppStorage("interfaceTheme") private var theme: InterfaceTheme = .system
     var body: some View {
         TabView(selection: $model.tab) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("Teleport credential expires in").font(.headline)
-                        Text(TeleportExpiry.label(model.expiry, now: model.now)).font(.system(size: 34, weight: .medium, design: .monospaced)).foregroundStyle(model.expiry.map { $0 <= model.now.addingTimeInterval(300) } == true ? .orange : .primary)
-                    }
-                    Spacer()
-                    Button("Log in") { model.manager?.loginToTeleport() }
-                }
-                Text(model.statsMessage).font(.caption).foregroundStyle(.secondary)
-                HStack(spacing: 32) {
-                    Text("\(model.connections.filter(\.listening).count) live listeners").font(.title2)
-                    Text("\(model.connections.reduce(0) { $0 + $1.sessions.count }) TCP sessions").font(.title2)
-                }
-                List(model.connections) { connection in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Image(systemName: connection.listening ? "circle.fill" : "circle").foregroundStyle(connection.listening ? .green : .secondary)
-                            Text(connection.name).bold()
-                            Spacer()
-                            Text(":\(connection.port) · \(connection.available ? (connection.listening ? "Listening" : "Stopped") : "Unavailable") · \(connection.sessions.count) sessions")
-                        }
-                        ForEach(Array(connection.sessions.enumerated()), id: \.offset) { _, session in Text(session).font(.system(.caption, design: .monospaced)).textSelection(.enabled) }
-                    }.padding(.vertical, 6)
-                }
-                Text("Local accepted TCP sockets, refreshed every 5 seconds. HTTP-to-SOCKS forwarding appears on both listeners. These are not cluster-wide Teleport SSH sessions.").font(.caption).foregroundStyle(.secondary)
-            }.padding(24).tabItem { Label("Outbound", systemImage: "network") }.tag(DashboardTab.connections)
+            OutboundSessionsView(model: model).tabItem { Label("Outbound", systemImage: "network") }.tag(DashboardTab.connections)
             BrowserDashboardView(model: manager.browserDashboard, remote: manager.remoteAccess).tabItem { Label("Dashboard", systemImage: "server.rack") }.tag(DashboardTab.browser)
             RemoteAccessView(model: manager.remoteAccess, manager: manager, browser: manager.browserDashboard).tabItem { Label("Inbound", systemImage: "point.3.connected.trianglepath.dotted") }.tag(DashboardTab.remote)
             GoogleCloudView(model: model.cloud).tabItem { Label("Google Cloud", systemImage: "cloud") }.tag(DashboardTab.cloud)
+            DevOpsView(model: model.devops).tabItem { Label("DevOps", systemImage: "hammer") }.tag(DashboardTab.devops)
             AdvancedSettingsView(manager: manager, updater: updater).tabItem { Label("Advanced", systemImage: "gearshape.2") }.tag(DashboardTab.advanced)
             AgentAccessView(model: manager.agentAccess, browser: manager.browserDashboard).tabItem { Label("Agents", systemImage: "person.badge.key") }.tag(DashboardTab.agents)
             SessionNotificationSettings(browser: manager.browserDashboard).tabItem { Label("Notifications", systemImage: "bell") }.tag(DashboardTab.notifications)
             AboutSettingsView().tabItem { Label("About", systemImage: "info.circle") }.tag(DashboardTab.about)
-        }.frame(minWidth: 1020, minHeight: 560).preferredColorScheme(theme.colorScheme)
+        }.frame(minWidth: 1140, minHeight: 560).preferredColorScheme(theme.colorScheme)
     }
 }
 extension InfraProxyManager {
     @objc func showDashboard() {
         if dashboardWindow == nil {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1060, height: 680), styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1180, height: 680), styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
             window.title = "infravibe — Operations"
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: OperationsView(model: operations, updater: appUpdater, manager: self))
@@ -159,5 +136,53 @@ extension InfraProxyManager {
         operations.refreshStats()
         dashboardWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+struct OutboundSessionsView: View {
+    @ObservedObject var model: OperationsModel
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                SettingsSection("Teleport") {
+                    HStack {
+                        Text("Credential expires in")
+                        Spacer()
+                        Text(TeleportExpiry.label(model.expiry, now: model.now))
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(model.expiry.map { $0 <= model.now.addingTimeInterval(300) } == true ? .orange : .primary)
+                        Button("Log in") { model.manager?.loginToTeleport() }
+                    }
+                    Text(model.statsMessage).font(.caption).foregroundStyle(.secondary)
+                }
+                SettingsSection("Live sessions") {
+                    LabeledContent("Listeners", value: String(model.connections.filter(\.listening).count))
+                    LabeledContent("TCP sessions", value: String(model.connections.reduce(0) { $0 + $1.sessions.count }))
+                    Text("Sessions accepted by this Mac’s outbound proxies. Refreshed every 5 seconds. Forwarding can appear on both listeners; these are not cluster-wide Teleport SSH sessions.").font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(model.connections) { connection in
+                    SettingsSection(connection.name) {
+                        HStack {
+                            Image(systemName: connection.listening ? "circle.fill" : "circle")
+                                .foregroundStyle(connection.listening ? .green : .secondary)
+                            Text(connection.available ? (connection.listening ? "Listening" : "Stopped") : "Unavailable")
+                            Spacer()
+                            Text("Port \(connection.port)").foregroundStyle(.secondary)
+                        }
+                        Divider()
+                        if !connection.available {
+                            Text("Session information could not be read.").foregroundStyle(.secondary)
+                        } else if connection.sessions.isEmpty {
+                            Text("No active sessions").foregroundStyle(.secondary)
+                        } else {
+                            ForEach(Array(connection.sessions.enumerated()), id: \.offset) { _, session in
+                                Label(session, systemImage: "arrow.left.arrow.right")
+                                    .font(.system(.callout, design: .monospaced)).textSelection(.enabled)
+                            }
+                        }
+                    }
+                }
+            }.padding(28)
+        }
     }
 }
