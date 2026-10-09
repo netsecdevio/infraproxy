@@ -69,6 +69,9 @@ struct AdvancedSettingsView: View {
                     LabeledContent("Screen Recording", value: "Not required")
                     Text("Session previews render terminal output; they do not capture your screen.").font(.caption).foregroundStyle(.secondary)
                     Divider()
+                    LabeledContent("Local Network", value: "For servers on your local network")
+                    Text("macOS may request access when you connect to a private monitoring server or local infrastructure.").font(.caption).foregroundStyle(.secondary)
+                    Divider()
                     LabeledContent("Files and Folders", value: "As needed for protected folders")
                     Text("Approve session workspaces in Dashboard. macOS may separately ask for access to protected folders. Full Disk Access is not required. Workspace approval does not grant macOS privacy permissions.").font(.caption).foregroundStyle(.secondary)
                     Button("Open System Settings") {

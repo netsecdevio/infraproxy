@@ -147,8 +147,10 @@ cat > InfraProxy.app/Contents/Info.plist << EOF
     <false/>
     <key>LSMinimumSystemVersion</key>
     <string>15.5</string>
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>infravibe connects to monitoring servers and infrastructure you configure on your local network.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>InfraProxy opens Google Cloud SSH connections in Terminal.</string>
+    <string>infravibe opens Google Cloud SSH connections in your preferred terminal.</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSUserNotificationAlertStyle</key>
