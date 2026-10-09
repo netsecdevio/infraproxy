@@ -17,7 +17,7 @@ The complete operator workflow, not just its polling adapters, is the acceptance
 - [x] Upgrade preserves existing 2.9 monitor credentials and IDs.
 - [x] Tests cover setup, migration, configuration round-trip, issue payload/redaction,
       mute/polling and error paths, plus real rendered UI verification.
-- [ ] Signed Universal release, Homebrew update and installed runtime verification.
+- [x] Signed Universal release, Homebrew update and installed runtime verification.
 
 ## Intentional replacements
 
@@ -36,3 +36,19 @@ src/extensions/observersfromLinkParser.ts, src/bun/tray.ts and observer-manager.
 - Mock issue transport verifies 2xx acceptance, error/redirect rejection and no automatic retry.
 - Native UI: public infravibe GitHub workflow link, discovery of two workflows, successful connection test, grouped save, mute, pause, template export and reviewed merge. Temporary monitors were removed afterwards.
 - Private provider accounts and downstream issue services are not claimed as live-validated. See Vendor/BARKLARM.md for API/version limits and intentional replacements.
+
+## Release evidence — 2.10.0 (13)
+
+- Source commit: 112e46ac28a485a782a7b870e80796d93b5d709e.
+- Contribution checks: https://github.com/netsecdevio/infravibe/actions/runs/37945907289 (passed).
+- Release: https://github.com/netsecdevio/infravibe/releases/tag/v2.10.0.
+- App and DMG notarization accepted; Sparkle feed/archive signatures and tamper-rejection tests passed.
+- All three uploaded asset SHA-256 digests matched the local artifacts.
+- Sparkle discovered 2.10.0 from installed 2.9.0, installed and relaunched it. Installed version/build and app/helper/sandbox hashes matched the release; Gatekeeper accepted the installed app.
+- The installed DevOps wizard populated the public infravibe workflow from its link and returned “Connection verified · Running”. No QA monitors were left configured.
+- Encrypted fixture restore reached the review screen in the signed build, preserving its polling and issue settings; canceled without applying synthetic credentials.
+- Homebrew fetched and verified infravibe 2.10.0. Cask style check passed.
+
+These checks do not claim live authentication against the other nine providers or
+creation of a real downstream issue. Those require the operator's own accounts
+and chosen destination; mock transport covers issue request behavior.
