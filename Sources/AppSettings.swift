@@ -104,7 +104,7 @@ struct AboutSettingsView: View {
                 Button("Open source notices") {
                     if let url = Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "md") { NSWorkspace.shared.open(url) }
                 }.buttonStyle(.link)
-                Text("MIT Licensed · infravibe contributors").font(.caption).foregroundStyle(.secondary).padding(.bottom, 24)
+                Text("GPL-3.0 · infravibe contributors").font(.caption).foregroundStyle(.secondary).padding(.bottom, 24)
             }.frame(maxWidth: .infinity).padding(24)
         }
     }
