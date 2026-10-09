@@ -58,3 +58,5 @@ dist/
 InfraProxy.zip
 InfraProxy-*.dmg
 InfraProxy-*.dmg.sha256
+
+Web/node_modules/

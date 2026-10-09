@@ -6,7 +6,7 @@ enum InterfaceTheme: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var colorScheme: ColorScheme? { self == .system ? nil : (self == .dark ? .dark : .light) }
 }
-enum DashboardTab: String { case connections, remote, cloud, updates }
+enum DashboardTab: String { case connections, browser, remote, cloud, updates, advanced, about }
 
 private struct PanelAction: View {
     let title: String
@@ -54,15 +54,18 @@ struct MenuBarPanel: View {
             Divider()
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    section("CONNECTIONS")
+                    section("PROVIDERS")
                     VStack(spacing: 1) {
                         providerRow("Teleport", icon: "shield.lefthalf.filled", color: .purple, status: teleportStatus, active: operations.expiry.map { $0 > operations.now } ?? false) { open(.connections) }
                         providerRow("Tailscale", icon: "point.3.filled.connected.trianglepath.dotted", color: .blue, status: remote.tailMessage, active: remote.tailscale?.connected == true) { open(.remote) }
                         providerRow("Cloudflare", icon: "cloud.fill", color: .orange, status: remote.cloudflarePath == nil ? "Not installed" : "Ready to share", active: false) { open(.remote) }
+                        providerRow("ngrok", icon: "arrow.down.forward.circle", color: .mint, status: remote.ngrokPath == nil ? "Not installed" : "Ready for inbound", active: false) { open(.remote) }
+                        providerRow("Browser dashboard", icon: "terminal", color: .teal, status: "Inbound access to this Mac", active: false) { open(.browser) }
                         providerRow("Google Cloud", icon: "cloud", color: .cyan, status: "Accounts & projects", active: false) { open(.cloud) }
                     }
                     CompactTunnel(tunnel: remote.tailTunnel)
                     CompactTunnel(tunnel: remote.cloudTunnel)
+                    CompactTunnel(tunnel: remote.ngrokTunnel)
                     if let hostname = remote.tailscale?.hostname, !hostname.isEmpty {
                         HStack(spacing: 5) {
                             Image(systemName: "lock.shield").foregroundStyle(.secondary)
@@ -109,6 +112,7 @@ struct MenuBarPanel: View {
                 Spacer(minLength: 0)
                 Menu {
                     Button("Check for Updates…") { manager.closePanel(); manager.appUpdater.check() }
+                    Button("About InfraProxy") { manager.closePanel(); manager.showAbout() }
                     Button("Show Logs…") { manager.closePanel(); manager.showLogs() }
                     Button("Advanced controls…") { manager.showAdvancedMenu() }
                     Divider()

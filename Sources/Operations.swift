@@ -135,10 +135,12 @@ struct OperationsView: View {
                     }.padding(.vertical, 6)
                 }
                 Text("Local accepted TCP sockets, refreshed every 5 seconds. HTTP-to-SOCKS forwarding appears on both listeners. These are not cluster-wide Teleport SSH sessions.").font(.caption).foregroundStyle(.secondary)
-            }.padding(24).tabItem { Label("Connections", systemImage: "network") }.tag(DashboardTab.connections)
-            RemoteAccessView(model: manager.remoteAccess, manager: manager).tabItem { Label("Remote Access", systemImage: "point.3.connected.trianglepath.dotted") }.tag(DashboardTab.remote)
+            }.padding(24).tabItem { Label("Outbound", systemImage: "network") }.tag(DashboardTab.connections)
+            BrowserDashboardView(model: manager.browserDashboard, remote: manager.remoteAccess).tabItem { Label("Dashboard", systemImage: "server.rack") }.tag(DashboardTab.browser)
+            RemoteAccessView(model: manager.remoteAccess, manager: manager, browser: manager.browserDashboard).tabItem { Label("Inbound", systemImage: "point.3.connected.trianglepath.dotted") }.tag(DashboardTab.remote)
             GoogleCloudView(model: model.cloud).tabItem { Label("Google Cloud", systemImage: "cloud") }.tag(DashboardTab.cloud)
-            UpdatesView(updater: updater).tabItem { Label("Updates", systemImage: "arrow.down.circle") }.tag(DashboardTab.updates)
+            AdvancedSettingsView(manager: manager, updater: updater).tabItem { Label("Advanced", systemImage: "gearshape.2") }.tag(DashboardTab.advanced)
+            AboutSettingsView().tabItem { Label("About", systemImage: "info.circle") }.tag(DashboardTab.about)
         }.frame(minWidth: 780, minHeight: 560).preferredColorScheme(theme.colorScheme)
     }
 }

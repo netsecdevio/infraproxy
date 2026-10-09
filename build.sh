@@ -7,8 +7,8 @@ SIGNING_IDENTITY="Developer ID Application: Doug Dowenr (J77629PP5S)"
 KEYCHAIN_PROFILE="InfraProxy"
 BUNDLE_ID="com.dynadobe.infraproxy"
 ENTITLEMENTS="infraproxy.entitlements"
-APP_VERSION="2.6.1"
-APP_BUILD="9"
+APP_VERSION="2.7.0"
+APP_BUILD="10"
 SPARKLE_FEED="https://github.com/netsecdevio/infraproxy/releases/latest/download/appcast.xml"
 
 # Parse arguments
@@ -27,6 +27,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 bash scripts/fetch-sparkle.sh
+(cd Web && npm ci --ignore-scripts --no-fund && npm audit --omit=dev)
 SPARKLE_PUBLIC_KEY=$(cat Resources/sparkle-public-key.txt)
 echo "Building InfraProxy..."
 
@@ -48,11 +49,15 @@ swiftc -target "$ARCH-apple-macosx15.5" -o "$BUILD_SLICES/InfraProxy-$ARCH" \
     Sources/MenuBarPanel.swift \
     Sources/RemoteAccess.swift \
     Sources/AppUpdater.swift \
+    Sources/AppSettings.swift \
+    Sources/BrowserServer.swift \
+    Sources/BrowserDashboard.swift \
     Sources/main.swift \
     -framework Cocoa \
     -framework UserNotifications \
     -F Vendor/Sparkle -framework Sparkle \
     -Xlinker -rpath -Xlinker @executable_path/../Frameworks
+clang -target "$ARCH-apple-macosx15.5" -O2 -Wall -Wextra Sources/Helpers/TerminalHost.c -o "$BUILD_SLICES/TerminalHost-$ARCH"
 done
 lipo -create "$BUILD_SLICES/InfraProxy-arm64" "$BUILD_SLICES/InfraProxy-x86_64" -output InfraProxy
 
@@ -61,6 +66,13 @@ lipo -create "$BUILD_SLICES/InfraProxy-arm64" "$BUILD_SLICES/InfraProxy-x86_64" 
 mkdir -p InfraProxy.app/Contents/MacOS
 mkdir -p InfraProxy.app/Contents/Resources
 mkdir -p InfraProxy.app/Contents/Frameworks
+lipo -create "$BUILD_SLICES/TerminalHost-arm64" "$BUILD_SLICES/TerminalHost-x86_64" -output InfraProxy.app/Contents/MacOS/TerminalHost
+mkdir -p InfraProxy.app/Contents/Resources/Web
+cp Web/index.html Web/app.js Web/style.css InfraProxy.app/Contents/Resources/Web/
+cp Web/node_modules/@xterm/xterm/lib/xterm.js Web/node_modules/@xterm/xterm/css/xterm.css InfraProxy.app/Contents/Resources/Web/
+cp Web/node_modules/@xterm/addon-fit/lib/addon-fit.js InfraProxy.app/Contents/Resources/Web/fit.js
+cp Web/node_modules/@xterm/xterm/LICENSE InfraProxy.app/Contents/Resources/xterm-LICENSE.txt
+cp Web/node_modules/@xterm/addon-fit/LICENSE InfraProxy.app/Contents/Resources/xterm-fit-LICENSE.txt
 ditto Vendor/Sparkle/Sparkle.framework InfraProxy.app/Contents/Frameworks/Sparkle.framework
 cp Vendor/Sparkle/LICENSE InfraProxy.app/Contents/Resources/Sparkle-LICENSE.txt
 cp Resources/VibeTunnel-LICENSE.txt InfraProxy.app/Contents/Resources/
@@ -159,6 +171,8 @@ if [ "$NOTARIZE" = true ]; then
         codesign --force --options runtime --preserve-metadata=identifier,entitlements \
             --sign "$SIGNING_IDENTITY" --timestamp "$component"
     done
+
+    codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp InfraProxy.app/Contents/MacOS/TerminalHost
 
     # Sign the app with hardened runtime (required for notarization)
     codesign --force --options runtime \

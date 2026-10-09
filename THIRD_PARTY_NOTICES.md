@@ -7,4 +7,8 @@ Amantus Machina and distributed under the MIT license; its notice is included
 in `Resources/VibeTunnel-LICENSE.txt` and the application bundle.
 
 In-app updates use Sparkle, whose license is included in the application bundle.
-Tailscale and cloudflared are separately installed provider tools.
+Browser terminals use xterm.js 5.5.0 and its fit addon 0.10.0 (MIT). Their
+licenses are included as `xterm-LICENSE.txt` and `xterm-fit-LICENSE.txt` in the
+application bundle. Packages are pinned with registry integrity hashes.
+
+Tailscale, ngrok, and cloudflared are separately installed provider tools.

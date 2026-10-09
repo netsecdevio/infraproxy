@@ -290,7 +290,7 @@ extension InfraProxyManager {
                 let data = handle.availableData
                 if let output = String(data: data, encoding: .utf8), !output.isEmpty {
                     DispatchQueue.main.async {
-                        self?.log(.info, "Login output: \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+                        self?.log(.info, "Teleport sign-in is in progress.")
                     }
                 }
             }
@@ -437,7 +437,7 @@ extension InfraProxyManager {
 
     // MARK: - Settings Window
 
-    @objc func showSettings() {
+    @objc func showProxySettings() {
         DispatchQueue.main.async { [weak self] in
             if self?.settingsWindow != nil {
                 self?.settingsWindow?.makeKeyAndOrderFront(nil)
@@ -1224,20 +1224,8 @@ extension InfraProxyManager {
 
     // MARK: - About
 
-    @objc func showAbout() {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.2.0"
-        let alert = NSAlert()
-        alert.messageText = "InfraProxy"
-        alert.informativeText = """
-        Version \(version)
-
-        Menu bar utility for managing Teleport SOCKS proxies, HTTP proxies, and launchctl services.
-        """
-        alert.alertStyle = .informational
-        alert.icon = NSApp.applicationIconImage
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
+    @objc func showSettings() { openDashboard(.advanced) }
+    @objc func showAbout() { openDashboard(.about) }
 
     // MARK: - Service Test & Auto-Start
 
@@ -1364,6 +1352,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        infraProxyManager?.browserDashboard.stop()
         infraProxyManager?.remoteAccess.shutdown()
         infraProxyManager?.operations.cloud.cancelLogin()
         infraProxyManager = nil

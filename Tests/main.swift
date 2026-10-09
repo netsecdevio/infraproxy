@@ -153,3 +153,23 @@ let stopDeadline = Date().addingTimeInterval(4)
 while ownedTunnel.running && Date() < stopDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
 assert(!ownedTunnel.running && !ownedTunnel.ready && ownedTunnel.url == nil)
 print("PASS: Tailscale discovery, existing-share protection, safe port validation, provider arguments, URL validation, owned tunnel readiness and shutdown")
+
+assert(RemoteCommands.arguments(.ngrok, port: 4020) == ["http", "http://127.0.0.1:4020", "--log=stdout", "--log-format=json", "--log-level=info", "--inspect=false"])
+assert(RemoteCommands.endpoint(in: #"{"msg":"started tunnel","url":"https://test.ngrok-free.app"}"#, provider: .ngrok)?.host == "test.ngrok-free.app")
+assert(RemoteCommands.endpoint(in: #"{"msg":"error","url":"https://dashboard.ngrok.com"}"#, provider: .ngrok) == nil)
+assert(RemoteCommands.endpoint(in: #"{"msg":"started tunnel","url":"https://secret@example.com"}"#, provider: .ngrok) == nil)
+let request = try BrowserRequest.parse(Data("POST /api/login HTTP/1.1\r\nHost: localhost:4020\r\nOrigin: http://localhost:4020\r\nContent-Length: 2\r\n\r\n{}".utf8))
+assert(request?.sameOrigin == true && request?.body == Data("{}".utf8))
+assert(BrowserSecurity.equal("same", "same") && !BrowserSecurity.equal("same", "diff"))
+print("PASS: ngrok agent arguments and URL parsing; browser request origin and authentication comparison")
+
+let ngrokFixture = SharedTunnel()
+ngrokFixture.start(executable: "/bin/sh", arguments: ["-c", "printf '%s\\n' '{\"msg\":\"started tunnel\",\"url\":\"https://fixture.ngrok-free.app\"}'; exec sleep 30"], provider: .ngrok, localPort: 4021)
+let ngrokDeadline = Date().addingTimeInterval(3)
+while !ngrokFixture.ready && Date() < ngrokDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+assert(ngrokFixture.running && ngrokFixture.ready && ngrokFixture.url?.host == "fixture.ngrok-free.app" && ngrokFixture.localPort == 4021)
+ngrokFixture.stop()
+let ngrokStopDeadline = Date().addingTimeInterval(4)
+while ngrokFixture.running && Date() < ngrokStopDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+assert(!ngrokFixture.running && !ngrokFixture.ready && ngrokFixture.url == nil && ngrokFixture.localPort == nil)
+print("PASS: owned ngrok process readiness, destination tracking, and shutdown")

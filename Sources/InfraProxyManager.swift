@@ -5,6 +5,7 @@ import SwiftUI
 
 class InfraProxyManager: NSObject, ObservableObject {
     internal let remoteAccess = RemoteAccessModel()
+    internal let browserDashboard = BrowserDashboard()
     private var menuPopover: NSPopover?
     internal var dashboardWindow: NSWindow?
     internal let operations = OperationsModel()
@@ -63,6 +64,7 @@ class InfraProxyManager: NSObject, ObservableObject {
         operations.manager = self
         operations.start()
         remoteAccess.start()
+        browserDashboard.manager = self
         startStatusRefresh()
         log(.info, "InfraProxy started")
     }
@@ -700,7 +702,7 @@ class InfraProxyManager: NSObject, ObservableObject {
                 let data = handle.availableData
                 if let output = String(data: data, encoding: .utf8), !output.isEmpty {
                     DispatchQueue.main.async {
-                        self?.log(.info, "Login output: \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
+                        self?.log(.info, "Teleport sign-in is in progress.")
                     }
                 }
             }
@@ -1108,6 +1110,7 @@ class InfraProxyManager: NSObject, ObservableObject {
     // MARK: - Logging
 
     internal func log(_ level: LogEntry.LogLevel, _ message: String) {
+        if level == .debug && !UserDefaults.standard.bool(forKey: "debugMode") { return }
         let entry = LogEntry(timestamp: Date(), level: level, message: message)
 
         let update = {

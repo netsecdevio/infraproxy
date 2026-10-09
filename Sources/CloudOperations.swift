@@ -290,11 +290,8 @@ final class GoogleCloudModel: ObservableObject {
         if action == "ssh" {
             let args = [path, "compute", "ssh", instance.name, "--account=" + account, "--project=" + project, "--zone=" + instance.shortZone, "--tunnel-through-iap"]
             let command = args.map(OperationsCommand.quote).joined(separator: " ")
-            let escaped = command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-            var error: NSDictionary?
-            let script = NSAppleScript(source: "tell application \"Terminal\"\nactivate\ndo script \"\(escaped)\"\nend tell")
-            script?.executeAndReturnError(&error)
-            message = error != nil || script == nil ? "Could not open Terminal. Check the macOS Automation permission for InfraProxy." : "SSH opened in Terminal for \(instance.name)."
+            let terminal = PreferredTerminal.selected
+            message = terminal.launch(command: command) ? "SSH opened in \(terminal.title) for \(instance.name)." : "Could not open \(terminal.title). Check its installation and macOS Automation permission for InfraProxy."
             return
         }
         busy = true

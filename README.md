@@ -13,7 +13,7 @@ listeners and TCP sessions, Tailscale connectivity, and cloud shortcuts. The
 **Appearance** control supports System, Light, and Dark themes. Right-click the
 icon for the existing advanced proxy and launch-service controls.
 
-Open **Tailscale** in the panel, or **Dashboard → Remote Access**, to discover your
+Open **Tailscale** in the panel, or **Operations → Inbound**, to discover your
 Mac and tailnet devices from the installed Tailscale client. Use **Open Tailscale**
 for provider sign-in and connection management.
 
@@ -21,14 +21,36 @@ To share a local web application, enter its listening port and choose:
 
 - **Tailscale Serve**: private HTTPS within your tailnet, subject to tailnet policy.
 - **Tailscale Funnel**: public HTTPS, requiring Funnel permission in Tailscale.
+- **ngrok**: public HTTPS using your installed, authenticated ngrok agent.
 - **Cloudflare**: a temporary public Quick Tunnel using installed `cloudflared`.
 
 Sharing requires an explicit confirmation. InfraProxy owns only the foreground
 tunnels it starts; stopping one preserves other tunnels. Tailscale sharing uses
 HTTPS port 8443 and refuses an occupied port. Existing Cloudflare configuration
 files are preserved; use the Cloudflare console to manage named tunnels.
-Configured infrastructure proxy ports cannot be shared. These controls share
-local web services; they do not provide VibeTunnel's browser terminal.
+Configured infrastructure proxy ports cannot be shared.
+
+### Browser dashboard and terminals (2.7.0+)
+
+Open **Dashboard**, start the browser server, then choose **Open Browser**. The
+server binds only to `127.0.0.1` (default port 4021). Its browser dashboard shows
+Teleport expiry, local listeners, TCP sessions, inbound URLs, and interactive
+terminals running as your Mac user. Both local and remote browsers authenticate.
+
+In **Inbound**, choose the InfraProxy dashboard or another local web service,
+then select a provider. Copy the access key from the Authentication section to
+sign in remotely. Tailscale's private tailnet mode is the default; public Funnel,
+ngrok, and Cloudflare sharing require an explicit confirmation. Provider account
+setup stays with the installed provider tools; InfraProxy never asks you to paste
+provider credentials into its settings.
+
+Browser sessions last eight hours. Restarting the server changes its key;
+**Rotate key** revokes browser sessions immediately. A disconnected terminal ends
+its shell; detached jobs may continue. Sharing and the browser server are off on
+launch. See [browser access security and limitations](BROWSER_ACCESS.md).
+
+**Advanced** contains terminal preferences, update checks, and debug logging.
+**About** shows the installed version, project links, and open-source credits.
 
 The menu design and sharing workflow draw inspiration from
 [VibeTunnel](https://github.com/amantus-ai/vibetunnel); see [notices](THIRD_PARTY_NOTICES.md).
@@ -41,7 +63,7 @@ both architectures and verifies every bundled executable, including Sparkle help
 
 ## In-app updates (2.6.0+)
 
-Use **Check for Updates…** in the menu bar or **Dashboard → Updates**. InfraProxy checks daily and offers signed updates for installation and relaunch. Automatic checks can be disabled in the Updates tab. Install v2.6.0 once to enable this on older installations.
+Use **Check for Updates…** in the menu bar or **Operations → Advanced**. InfraProxy checks daily and offers signed updates for installation and relaunch. Automatic checks can be disabled in the Advanced tab. Install v2.6.0 once to enable this on older installations.
 
 Release maintainers: see [UPDATING.md](UPDATING.md) for the signed-feed publishing workflow.
 
@@ -66,15 +88,15 @@ The dashboard also shows the Teleport credential-expiry countdown and per-port T
 ## Prerequisites
 
 - macOS 15.5 (Sequoia) or later
-- [Teleport](https://goteleport.com/) SSH client (`tsh`) installed
-- Valid Teleport cluster access credentials
+- Xcode command-line tools and Node.js/npm for source builds
+- Provider CLIs and accounts for the integrations you use (Teleport, Google Cloud, Tailscale, ngrok, or Cloudflare)
 
 ## Installation
 
 ### Option 1: Download Release
 1. Download `InfraProxy.app` from [Releases](../../releases)
 2. Move to `/Applications` folder
-3. Right-click → Open → Open (to bypass Gatekeeper on first launch)
+3. Open the signed, notarized app.
 
 ### Option 2: Build from Source
 ```bash
@@ -169,9 +191,9 @@ networksetup -setsocksfirewallproxystate "Wi-Fi" off
 
 ### Debug Mode
 Enable detailed logging:
-1. Open **Show Logs**
-2. Check for ERROR/WARN messages
-3. Export logs for troubleshooting
+1. Enable **Advanced → Debug mode**
+2. Open **Show Logs**
+3. Check operational diagnostics; terminal content and browser access keys are not recorded.
 
 ## Security Considerations
 
