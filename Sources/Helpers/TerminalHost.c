@@ -17,10 +17,11 @@ static int write_all(int fd, const void *data, size_t count) {
     while (count) { ssize_t n = write(fd, p, count); if (n < 0 && errno == EINTR && !stopping) continue; if (n <= 0) return -1; p += n; count -= n; }
     return 0;
 }
-int main(void) {
+int main(int argc, char **argv) {
     struct passwd *user = getpwuid(getuid());
     const char *shell = user && user->pw_shell && user->pw_shell[0] ? user->pw_shell : "/bin/zsh";
-    if (user && user->pw_dir) chdir(user->pw_dir);
+    if (argc > 1) { if (chdir(argv[1]) != 0) return 1; }
+    else if (user && user->pw_dir) chdir(user->pw_dir);
     struct winsize size = {.ws_row = 24, .ws_col = 80};
     int master = -1;
     pid_t child = forkpty(&master, NULL, NULL, &size);
@@ -29,10 +30,12 @@ int main(void) {
         setenv("TERM", "xterm-256color", 1); setenv("COLORTERM", "truecolor", 1);
         const char *name = strrchr(shell, '/'); name = name ? name + 1 : shell;
         char login[256]; login[0] = '-'; strlcpy(login + 1, name, sizeof(login) - 1);
+        if (argc > 2) { execv(argv[2], &argv[2]); _exit(127); }
         execl(shell, login, (char *)NULL); _exit(127);
     }
     signal(SIGTERM, stop); signal(SIGINT, stop); signal(SIGHUP, stop); signal(SIGPIPE, SIG_IGN);
     unsigned char input[65541], output[16384]; size_t used = 0;
+    int child_status = 0, reaped = 0;
     while (!stopping) {
         fd_set fds; FD_ZERO(&fds); FD_SET(STDIN_FILENO, &fds); FD_SET(master, &fds);
         struct timeval timeout = {.tv_sec = 1, .tv_usec = 0};
@@ -61,12 +64,13 @@ int main(void) {
                 memmove(input, input + length, used - length); used -= length;
             }
         }
-        if (waitpid(child, NULL, WNOHANG) == child) break;
+        if (waitpid(child, &child_status, WNOHANG) == child) { reaped = 1; break; }
     }
+    if (reaped) { close(master); return WIFEXITED(child_status) ? WEXITSTATUS(child_status) : 128 + WTERMSIG(child_status); }
     pid_t foreground = tcgetpgrp(master);
     if (foreground > 0) kill(-foreground, SIGHUP);
     kill(-child, SIGHUP); close(master);
-    for (int i = 0; i < 20; i++) { if (waitpid(child, NULL, WNOHANG) != 0) return 0; usleep(100000); }
+    for (int i = 0; i < 20; i++) { if (waitpid(child, &child_status, WNOHANG) == child) return WIFEXITED(child_status) ? WEXITSTATUS(child_status) : 128 + WTERMSIG(child_status); usleep(100000); }
     kill(-child, SIGKILL); waitpid(child, NULL, 0);
     return 0;
 }

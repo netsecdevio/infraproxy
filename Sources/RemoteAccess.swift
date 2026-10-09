@@ -285,8 +285,8 @@ struct RemoteAccessView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 SettingsSection("Authentication") {
-                    LabeledContent("Authentication method", value: "Rotating access key")
-                    Text("Every browser connection needs the key, including localhost and provider tunnels. Browser sessions expire after 8 hours. Anyone with the key can open a shell as your Mac user.").font(.caption).foregroundStyle(.secondary)
+                    LabeledContent("Authentication method", value: "SSH browser key or access key")
+                    Text("Every browser connection authenticates, including localhost and provider tunnels. Browser sessions expire after 8 hours. Anyone with the key can open a shell as your Mac user.").font(.caption).foregroundStyle(.secondary)
                     HStack {
                         Button("Copy access key", action: browser.copyKey).disabled(!browser.running)
                         Button("Rotate key…") { confirmRotation = true }.disabled(!browser.running)
@@ -294,9 +294,10 @@ struct RemoteAccessView: View {
                         Button("Open local browser", action: browser.openBrowser).disabled(!browser.running)
                     }
                 }
+                SettingsSection("Trusted browser keys") { BrowserKeySettings(model: manager.browserKeys) }
                 SettingsSection("Inbound destination") {
                     Picker("Forward incoming traffic to", selection: $targetDashboard) {
-                        Text("InfraProxy dashboard & terminal").tag(true)
+                        Text("infravibe dashboard & terminal").tag(true)
                         Text("Another local web service").tag(false)
                     }
                     if targetDashboard {
@@ -309,7 +310,7 @@ struct RemoteAccessView: View {
                     Picker("Access", selection: $provider) { Text("Private · tailnet only").tag(RemoteProvider.tailscale); Text("Public · Funnel").tag(RemoteProvider.funnel) }.pickerStyle(.segmented)
                     HStack { Text("Incoming HTTPS on port 8443").font(.caption).foregroundStyle(.secondary); Spacer(); Button("Start inbound access…") { share(provider) }.disabled(model.preparing || model.tailTunnel.running || (targetDashboard && !browser.running)) }
                     TunnelControls(title: "Tailscale", tunnel: model.tailTunnel)
-                    Text("Private Serve access follows your tailnet policy. The InfraProxy browser key is still required.").font(.caption).foregroundStyle(.secondary)
+                    Text("Private Serve access follows your tailnet policy. The infravibe browser key is still required.").font(.caption).foregroundStyle(.secondary)
                 }
                 SettingsSection("ngrok integration") {
                     HStack { Text(model.ngrokMessage); Spacer(); Link("Account setup", destination: URL(string: "https://dashboard.ngrok.com/get-started/setup/macos")!) }

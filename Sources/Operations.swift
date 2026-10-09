@@ -140,15 +140,17 @@ struct OperationsView: View {
             RemoteAccessView(model: manager.remoteAccess, manager: manager, browser: manager.browserDashboard).tabItem { Label("Inbound", systemImage: "point.3.connected.trianglepath.dotted") }.tag(DashboardTab.remote)
             GoogleCloudView(model: model.cloud).tabItem { Label("Google Cloud", systemImage: "cloud") }.tag(DashboardTab.cloud)
             AdvancedSettingsView(manager: manager, updater: updater).tabItem { Label("Advanced", systemImage: "gearshape.2") }.tag(DashboardTab.advanced)
+            AgentAccessView(model: manager.agentAccess, browser: manager.browserDashboard).tabItem { Label("Agents", systemImage: "person.badge.key") }.tag(DashboardTab.agents)
+            SessionNotificationSettings(browser: manager.browserDashboard).tabItem { Label("Notifications", systemImage: "bell") }.tag(DashboardTab.notifications)
             AboutSettingsView().tabItem { Label("About", systemImage: "info.circle") }.tag(DashboardTab.about)
-        }.frame(minWidth: 780, minHeight: 560).preferredColorScheme(theme.colorScheme)
+        }.frame(minWidth: 1020, minHeight: 560).preferredColorScheme(theme.colorScheme)
     }
 }
 extension InfraProxyManager {
     @objc func showDashboard() {
         if dashboardWindow == nil {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 840, height: 600), styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
-            window.title = "InfraProxy — Operations"
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1060, height: 680), styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+            window.title = "infravibe — Operations"
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: OperationsView(model: operations, updater: appUpdater, manager: self))
             window.center()

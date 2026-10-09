@@ -28,15 +28,15 @@ struct UpdatesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             Label("Software updates", systemImage: "arrow.down.circle").font(.title.bold())
-            Text("InfraProxy \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+            Text("infravibe \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
                 .font(.title2)
             Text("Get new features and fixes without downloading and replacing the app yourself.")
                 .foregroundStyle(.secondary)
             Toggle("Automatically check for new releases", isOn: Binding(get: { updater.automaticChecks }, set: updater.setAutomaticChecks))
-            Text("InfraProxy checks daily and notifies you when an update is available. You choose when to install it.")
+            Text("infravibe checks daily and notifies you when an update is available. You choose when to install it.")
                 .font(.caption).foregroundStyle(.secondary)
             Button("Check for Updates…", action: updater.check).disabled(!updater.canCheck)
-            Text("Installing an update restarts InfraProxy. Updates and the release feed are signed and verified before installation.")
+            Text("Installing an update restarts infravibe. Updates and the release feed are signed and verified before installation.")
                 .font(.caption).foregroundStyle(.secondary)
             Link("View release history", destination: URL(string: "https://github.com/netsecdevio/infravibe/releases")!)
             Spacer()

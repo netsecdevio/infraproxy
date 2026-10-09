@@ -1,57 +1,21 @@
-# Browser access
+# Standalone browser access
 
-InfraProxy's browser server is an optional remote control surface for the Mac
-user running the app. It is not a multi-user host or a sandbox. Anyone with a
-valid access key can see connection metadata and run a shell with that user's
-filesystem and network permissions. Share access only with trusted operators.
+Start Dashboard in the Mac app, then open the local browser. Inbound settings can forward its loopback service through Tailscale, Cloudflare, or ngrok. The remote client uses the provider URL, not localhost. Sharing stays off until explicitly enabled.
 
-## Authentication and network boundary
+## Authentication
 
-- The server is off at launch and binds only to IPv4 loopback, default port 4021.
-- Local browsers authenticate too. Open Browser supplies the current key in a
-  URL fragment; the page clears the fragment immediately and submits the key.
-- A 256-bit random access key exists only in app memory. It changes on server
-  start and on Rotate key. Provider credentials remain with the provider CLI.
-- Session cookies are HttpOnly, SameSite=Strict, expire after eight hours, and
-  use Secure for HTTPS origins. Loopback HTTP intentionally omits Secure.
-- Inbound providers terminate TLS and forward to loopback. Only localhost and
-  currently ready provider hosts are accepted. Do not place an additional
-  untrusted proxy in front of the server or rewrite its Host/Origin headers.
-- Mutating requests and WebSocket upgrades require same-origin checks.
-  WebSockets also require a single-use, 30-second ticket and a valid cookie.
-- Login failures are rate limited globally (10 per minute). Connections,
-  sessions, tickets, terminal count, request bodies, frames, and I/O queues are
-  bounded. This limits resource use but does not promise public DoS resistance.
-- Tailscale identity headers are not trusted as application authentication.
-  Private tailnet policy adds protection; the app key is still required.
+Use the Mac app's rotating access key or an Ed25519 challenge signed by a key authorized in the host user's ~/.ssh/authorized_keys. The browser can generate a private key locally and download its public key for the owner to add through normal SSH administration. The app does not edit authorized_keys. Only option-free Ed25519 entries are accepted; options are never ignored. Private keys remain client-side. Key-file changes invalidate human sessions at the next one-second refresh.
 
-## Terminal lifecycle
+Agent access uses separate token hashes and expiring local grants. SPIFFE/SPIRE integration is deferred. Tokens and shell output must not be included in issue reports.
 
-Each browser terminal owns a native PTY helper and a login shell. Closing the
-connection ends its shell; key rotation, sign-out, expiry, server stop, and app
-quit revoke the appropriate terminals. Foreground processes receive hangup;
-detached jobs may remain as they do after closing a local terminal window.
-Terminals cannot currently be detached and reattached in another browser.
-All authenticated operators share the same Mac-user scope and can end active
-terminal sessions. There are no separate roles or per-user audit records.
+## Terminal restrictions
 
-Terminal output and access keys are not logged. Browser assets are bundled,
-with no CDN or analytics. Terminal clipboard and clickable-link integrations are
-disabled; terminal escape sequences cannot grant filesystem isolation. Browser
-session cookies are never stored in localStorage.
+Every newly created terminal runs under a macOS sandbox profile with access to its selected approved workspace and private temporary home. Environment variables are replaced with a minimal allowlist. Network, host credential stores, and unrelated filesystem contents are denied. Some file metadata and system runtime files remain readable. The default workspace is ~/infravibe-workspace; additional project folders are approved locally in Dashboard. Choose narrow folders: all contents of the selected workspace are accessible to that session.
 
-## Provider and release scope
+No existing host tmux attachment, unrestricted shell fallback, or networking elevation is provided in this release. If sandbox setup fails, the session fails rather than running unrestricted. macOS sandbox-exec is a platform dependency; future OS compatibility must be tested.
 
-Inbound tunnels stay off until started and public sharing requires a native
-confirmation. The app stops only processes it owns. Sharing another local web
-service exposes that service's own authentication, not InfraProxy's key gate.
-The browser server does not expose the outbound SOCKS proxy.
+Disconnecting a browser leaves its terminal running, bounded to eight hours. End session or stop the server to terminate the PTY. Detached descendants may outlive the shell, but inherit its sandbox. Revocation cannot undo files already changed or credentials already disclosed.
 
-Tests cover actual loopback HTTP/WebSocket and PTY behavior plus provider
-command construction. Real ngrok, Cloudflare, and tailnet reachability depends
-on provider installation, account entitlements, network policy, and browser
-TLS. Validate those routes in your environment before relying on remote access.
+## Retained data
 
-Source builds install pinned npm packages with lifecycle scripts disabled.
-Release builds scan every Mach-O for arm64 and x86_64, sign nested executables,
-notarize the app and DMG, and sign the Sparkle feed.
+Exited sessions store bounded output (256 KiB each, at most 100 sessions) under the user's application-support directory with restrictive filesystem permissions. This history is not application-encrypted. Use Clear exited to remove saved history. Session notification contents exclude commands, directories, and output.

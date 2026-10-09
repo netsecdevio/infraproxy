@@ -6,7 +6,7 @@ enum InterfaceTheme: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var colorScheme: ColorScheme? { self == .system ? nil : (self == .dark ? .dark : .light) }
 }
-enum DashboardTab: String { case connections, browser, remote, cloud, updates, advanced, about }
+enum DashboardTab: String { case connections, browser, remote, cloud, updates, advanced, agents, notifications, about }
 
 private struct PanelAction: View {
     let title: String
@@ -34,10 +34,10 @@ struct MenuBarPanel: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 9) {
-                    Image(systemName: "network").font(.title2).foregroundStyle(Color.accentColor)
+                    Image(nsImage: BrandMark.image).foregroundStyle(Color.orange)
                         .frame(width: 32, height: 32).background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("InfraProxy").font(.system(size: 15, weight: .semibold))
+                        Text("infravibe").font(.system(size: 15, weight: .semibold))
                         Text("Your infrastructure, connected").font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -52,59 +52,30 @@ struct MenuBarPanel: View {
                 }.font(.system(size: 11)).foregroundStyle(.secondary)
             }.padding(16).background(LinearGradient(colors: [Color.accentColor.opacity(colorScheme == .dark ? 0.09 : 0.06), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
             Divider()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    section("PROVIDERS")
-                    VStack(spacing: 1) {
-                        providerRow("Teleport", icon: "shield.lefthalf.filled", color: .purple, status: teleportStatus, active: operations.expiry.map { $0 > operations.now } ?? false) { open(.connections) }
-                        providerRow("Tailscale", icon: "point.3.filled.connected.trianglepath.dotted", color: .blue, status: remote.tailMessage, active: remote.tailscale?.connected == true) { open(.remote) }
-                        providerRow("Cloudflare", icon: "cloud.fill", color: .orange, status: remote.cloudflarePath == nil ? "Not installed" : "Ready to share", active: false) { open(.remote) }
-                        providerRow("ngrok", icon: "arrow.down.forward.circle", color: .mint, status: remote.ngrokPath == nil ? "Not installed" : "Ready for inbound", active: false) { open(.remote) }
-                        providerRow("Browser dashboard", icon: "terminal", color: .teal, status: "Inbound access to this Mac", active: false) { open(.browser) }
-                        providerRow("Google Cloud", icon: "cloud", color: .cyan, status: "Accounts & projects", active: false) { open(.cloud) }
-                    }
-                    CompactTunnel(tunnel: remote.tailTunnel)
-                    CompactTunnel(tunnel: remote.cloudTunnel)
-                    CompactTunnel(tunnel: remote.ngrokTunnel)
-                    if let hostname = remote.tailscale?.hostname, !hostname.isEmpty {
-                        HStack(spacing: 5) {
-                            Image(systemName: "lock.shield").foregroundStyle(.secondary)
-                            Text(hostname).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
-                            Spacer(minLength: 0)
-                            Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(hostname, forType: .string) } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).help("Copy Tailscale hostname")
-                        }.font(.system(size: 10)).padding(.horizontal, 6)
-                    }
-                    Divider()
+            VStack(alignment: .leading, spacing: 12) {
+                Button { open(.connections) } label: {
                     HStack {
-                        section("LOCAL ACTIVITY")
+                        Label("Infrastructure", systemImage: "server.rack")
                         Spacer()
-                        Button("View all") { open(.connections) }.font(.system(size: 10)).buttonStyle(.plain).foregroundStyle(Color.accentColor)
-                    }
-                    if operations.connections.isEmpty {
-                        Text("No configured listeners").font(.caption).foregroundStyle(.secondary).padding(.vertical, 8)
-                    } else {
-                        ForEach(operations.connections) { connection in
-                            HStack(spacing: 9) {
-                                Circle().fill(connection.listening ? Color.green : Color.secondary.opacity(0.4)).frame(width: 6, height: 6)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(connection.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
-                                    Text("localhost:\(connection.port)").font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(connection.available ? "\(connection.sessions.count) sessions" : "Unavailable").font(.system(size: 10)).foregroundStyle(.secondary)
-                            }.padding(10).background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
-                        }
-                    }
-                    HStack {
-                        Button(manager.isRunning ? "Stop Teleport proxy" : "Start Teleport proxy") {
-                            manager.closePanel()
-                            if manager.isRunning { manager.stopProxy() } else { manager.startProxy() }
-                        }.font(.system(size: 11))
-                        Spacer()
-                        Button("Log in") { manager.closePanel(); manager.loginToTeleport() }.font(.system(size: 11))
-                    }
-                }.padding(14)
-            }.frame(height: 380)
+                        Text("\(online) online").foregroundStyle(.secondary)
+                    }.font(.system(size: 12, weight: .medium))
+                }.buttonStyle(.plain)
+                HStack {
+                    Text("Teleport").font(.system(size: 11))
+                    Spacer()
+                    Text(teleportStatus).font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+                Divider()
+                RemoteOverview(browser: manager.browserDashboard, remote: remote) { open(.browser) }
+                Divider()
+                HStack {
+                    Label("DevOps", systemImage: "hammer")
+                    Spacer()
+                    Text("Not connected").foregroundStyle(.secondary)
+                }.font(.system(size: 12, weight: .medium))
+                Text("Pipelines, pull requests & issues")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+            }.padding(16)
             Divider()
             HStack(spacing: 2) {
                 PanelAction(title: "Dashboard", icon: "square.grid.2x2") { open(.connections) }
@@ -112,21 +83,14 @@ struct MenuBarPanel: View {
                 Spacer(minLength: 0)
                 Menu {
                     Button("Check for Updates…") { manager.closePanel(); manager.appUpdater.check() }
-                    Button("About InfraProxy") { manager.closePanel(); manager.showAbout() }
+                    Button("About infravibe") { manager.closePanel(); manager.showAbout() }
                     Button("Show Logs…") { manager.closePanel(); manager.showLogs() }
                     Button("Advanced controls…") { manager.showAdvancedMenu() }
                     Divider()
-                    Button("Quit InfraProxy") { manager.quitApp() }
+                    Button("Quit infravibe") { manager.quitApp() }
                 } label: { Image(systemName: "ellipsis.circle").font(.system(size: 15)) }.menuStyle(.borderlessButton).frame(width: 28).help("More actions")
             }.padding(.horizontal, 10).padding(.vertical, 8)
-            HStack {
-                Text("Appearance").font(.system(size: 10)).foregroundStyle(.secondary)
-                Spacer()
-                Picker("Appearance", selection: $theme) {
-                    ForEach(InterfaceTheme.allCases) { Text($0.rawValue).tag($0) }
-                }.labelsHidden().pickerStyle(.segmented).controlSize(.small).frame(width: 185)
-            }.padding(.horizontal, 16).padding(.bottom, 12)
-        }.frame(width: 400, height: 554).background(.regularMaterial).environment(\.colorScheme, theme.colorScheme ?? colorScheme)
+        }.frame(width: 350, height: 400).background(.regularMaterial).environment(\.colorScheme, theme.colorScheme ?? colorScheme)
     }
     private var teleportStatus: String {
         if operations.expiry == nil { return "Sign in to view expiry" }
@@ -146,15 +110,46 @@ struct MenuBarPanel: View {
         }.buttonStyle(.plain)
     }
 }
+private struct RemoteOverview: View {
+    @ObservedObject var browser: BrowserDashboard
+    @ObservedObject var remote: RemoteAccessModel
+    var open: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(action: open) {
+                HStack {
+                    Label("Remote workspace", systemImage: "terminal")
+                    Spacer()
+                    Text(browser.running ? "\(browser.sessions.count) sessions" : "Stopped").foregroundStyle(.secondary)
+                }.font(.system(size: 12, weight: .medium))
+            }.buttonStyle(.plain)
+            CompactTunnel(tunnel: remote.tailTunnel)
+            CompactTunnel(tunnel: remote.cloudTunnel)
+            CompactTunnel(tunnel: remote.ngrokTunnel)
+            if !remote.tailTunnel.running && !remote.cloudTunnel.running && !remote.ngrokTunnel.running {
+                Text("Remote access is off").font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
 private struct CompactTunnel: View {
     @ObservedObject var tunnel: SharedTunnel
     var body: some View {
         if tunnel.running {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(tunnel.provider?.rawValue ?? "Tunnel") · \(tunnel.message)").font(.system(size: 10, weight: .medium))
-                if let url = tunnel.url, tunnel.ready { Link(url.absoluteString, destination: url).font(.system(size: 10)).lineLimit(1) }
-                Button("Stop sharing", action: tunnel.stop).font(.system(size: 10))
-            }.padding(9).frame(maxWidth: .infinity, alignment: .leading).background(Color.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 7))
+            HStack(spacing: 6) {
+                Circle().fill(tunnel.ready ? Color.green : Color.orange).frame(width: 5, height: 5)
+                Text(tunnel.provider?.rawValue ?? "Tunnel").font(.system(size: 10, weight: .medium))
+                if let url = tunnel.url, tunnel.ready {
+                    Link(url.host ?? url.absoluteString, destination: url).font(.system(size: 10)).lineLimit(1).truncationMode(.middle)
+                    Spacer(minLength: 0)
+                    Button {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                    } label: { Image(systemName: "doc.on.doc") }.buttonStyle(.plain).help("Copy remote URL")
+                } else {
+                    Text(tunnel.message).font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
         }
     }
 }

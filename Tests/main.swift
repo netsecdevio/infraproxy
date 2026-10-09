@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 let payload = """
 {"active":{"profile_url":"https://other.example:443","valid_until":"2030-01-01T00:00:00Z"},"profiles":[{"profile_url":"https://target.example:443","valid_until":"2026-10-08T12:00:00.123Z"}]}
@@ -173,3 +174,43 @@ let ngrokStopDeadline = Date().addingTimeInterval(4)
 while ngrokFixture.running && Date() < ngrokStopDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
 assert(!ngrokFixture.running && !ngrokFixture.ready && ngrokFixture.url == nil && ngrokFixture.localPort == nil)
 print("PASS: owned ngrok process readiness, destination tracking, and shutdown")
+
+let agentStore = AgentAccess()
+let agentToken = agentStore.create(name: "Fixture", hours: 1)!
+let agentGrant = agentStore.authenticate(agentToken)!
+assert(!agentGrant.canControl && agentStore.authenticate(agentToken + "bad") == nil)
+agentStore.requestControl(agentGrant.id)
+assert(agentStore.grant(agentGrant.id)!.requestedControl && !agentStore.grant(agentGrant.id)!.canControl)
+agentStore.approveControl(agentGrant.id)
+assert(agentStore.grant(agentGrant.id)!.canControl)
+agentStore.revoke(agentGrant.id)
+assert(agentStore.authenticate(agentToken) == nil)
+let signingKey = Curve25519.Signing.PrivateKey()
+let rawPublic = signingKey.publicKey.rawRepresentation
+let wirePublic = Data([0,0,0,11]) + Data("ssh-ed25519".utf8) + Data([0,0,0,32]) + rawPublic
+let browserKeys = BrowserKeys()
+assert(browserKeys.add("ssh-ed25519 " + wirePublic.base64EncodedString(), label: "Fixture"))
+let challengeData = Data("challenge".utf8), signatureData = try signingKey.signature(for: challengeData)
+assert(browserKeys.verify(publicKey: rawPublic.base64EncodedString(), signature: signatureData.base64EncodedString(), challenge: challengeData))
+assert(!browserKeys.verify(publicKey: rawPublic.base64EncodedString(), signature: signatureData.base64EncodedString(), challenge: Data("other".utf8)))
+browserKeys.remove(browserKeys.all[0].id)
+assert(!browserKeys.verify(publicKey: rawPublic.base64EncodedString(), signature: signatureData.base64EncodedString(), challenge: challengeData))
+print("PASS: separate agent identity, local-only approval, revocation, Ed25519 browser proof, and key revocation")
+
+let authorizedFixture = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+defer { try? FileManager.default.removeItem(at: authorizedFixture) }
+let publicLine = "ssh-ed25519 " + wirePublic.base64EncodedString() + " fixture\n"
+try publicLine.write(to: authorizedFixture, atomically: true, encoding: .utf8)
+let authorizedStore = BrowserKeys(authorizedFile: authorizedFixture)
+assert(authorizedStore.verify(publicKey: rawPublic.base64EncodedString(), signature: signatureData.base64EncodedString(), challenge: challengeData))
+assert(!authorizedStore.add(publicLine, label: "No remote enrollment"))
+var invalidated = false
+ authorizedStore.onRevoke = { invalidated = true }
+authorizedStore.refreshAuthorization()
+try ("restrict " + publicLine).write(to: authorizedFixture, atomically: true, encoding: .utf8)
+authorizedStore.refreshAuthorization()
+assert(invalidated && authorizedStore.all.isEmpty)
+assert(!authorizedStore.verify(publicKey: rawPublic.base64EncodedString(), signature: signatureData.base64EncodedString(), challenge: challengeData))
+assert(SessionWorkspaces.permits(SessionWorkspaces.defaultURL.path))
+assert(!SessionWorkspaces.permits(FileManager.default.homeDirectoryForCurrentUser.path))
+print("PASS: authorized_keys source, restricted-entry denial, revocation and workspace scope")

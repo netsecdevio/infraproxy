@@ -1,13 +1,16 @@
-# InfraProxy 2.7.0
+# infravibe 2.8.0
 
-- Adds an authenticated browser dashboard with live Teleport expiry, local connection statistics, inbound URLs, and interactive terminal sessions on this Mac.
-- Adds inbound ngrok HTTPS access alongside Tailscale Serve/Funnel and Cloudflare Quick Tunnels. Choose the InfraProxy dashboard or an existing local web service.
-- Redesigns Inbound settings with authentication, destination, provider status, private/public Tailscale controls, and discovered tailnet devices.
-- Adds About and Advanced tabs with version and project links, open-source credits, preferred Terminal/iTerm2, update controls, and debug logging.
-- Browser access requires a rotating key, uses eight-hour sessions and single-use terminal tickets, and binds only to localhost. Restart or rotate the key to revoke access. Inbound sharing remains off until explicitly started.
-- Defaults to port 4021 so InfraProxy can coexist with VibeTunnel on port 4020.
-- Ships Universal 2 binaries, including the new native PTY helper, for Apple Silicon and Intel. Signed and notarized for macOS 15.5 and later.
+InfraProxy is now infravibe, with the lowercase Cadence identity and a compact menu overview. Legacy bundle identifiers and the InfraProxy.app filename are retained for update compatibility.
 
-Use **Check for Updates…** to install and relaunch. Stop active browser terminals before updating; their shells end when the app quits. Detached jobs may continue.
+- Reconnectable browser terminal sessions, live output previews, session sidebar, and bounded exited-session history.
+- Standalone terminal sandbox: selected approved workspace access, isolated temporary home, no inherited credentials, and no network access. The default workspace is ~/infravibe-workspace. Approve additional repository folders locally in Dashboard.
+- SSH challenge authentication reads the target Mac's ~/.ssh/authorized_keys. This release accepts option-free Ed25519 entries only; restricted entries and unsupported algorithms are rejected. Changes invalidate browser sessions on the next authorization refresh.
+- Separate expiring agent tokens, local terminal-control approval, own-session authorization, revocation, and activity records through MCP.
+- Native session start/end notification settings and sound controls. Command-level events are not yet supported.
+- Homebrew cask renamed to infravibe with scoped trust instructions.
 
-Validation covers native UI, real browser login and terminal I/O, PTY resizing and interrupts, authentication/origin checks, key revocation, bounded request parsing, and Universal 2 packaging. Public-provider routing requires your provider account and policy; no public tunnel is enabled by this update.
+Terminal networking, attachment to existing host tmux sessions, native-terminal forwarding, the expanded command composer, and SPIFFE/SPIRE are not included. Network-enabled AI coding tools cannot run inside these restricted terminals yet. Provider tunnels remain available for inbound dashboard access and existing local web services.
+
+All bundled executables are Universal2. The sandbox uses macOS sandbox-exec and fails closed if its executable or policy is unavailable; compatibility with unreleased macOS versions is not guaranteed. Authentication does not replace sandbox enforcement.
+
+Use Check for Updates to install and relaunch. Updating ends active terminals. Exited history retains up to 100 sessions with 256 KiB output each; clear saved sessions to remove it. History is protected by filesystem permissions, not application-level encryption. Do not intentionally store credentials in terminal output.

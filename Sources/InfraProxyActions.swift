@@ -146,7 +146,7 @@ extension InfraProxyManager {
             }
             self?.isRunning = false
             self?.rebuildMenu()
-            self?.showNotification(title: "IA Proxy Stopped", message: "InfraProxy has been stopped")
+            self?.showNotification(title: "IA Proxy Stopped", message: "infravibe has been stopped")
         }
     }
 
@@ -467,7 +467,7 @@ extension InfraProxyManager {
             backing: .buffered,
             defer: false
         )
-        settingsWindow?.title = "InfraProxy Settings"
+        settingsWindow?.title = "infravibe Settings"
         settingsWindow?.center()
         settingsWindow?.isReleasedWhenClosed = false
 
@@ -1139,7 +1139,7 @@ extension InfraProxyManager {
             backing: .buffered,
             defer: false
         )
-        logsWindow?.title = "InfraProxy Logs"
+        logsWindow?.title = "infravibe Logs"
         logsWindow?.center()
         logsWindow?.isReleasedWhenClosed = false
 

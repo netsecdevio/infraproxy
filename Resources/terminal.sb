@@ -1,0 +1,23 @@
+(version 1)
+(deny default)
+(allow syscall*)
+(allow mach-bootstrap)
+(import "dyld-support.sb")
+(allow process-exec process-fork)
+(allow signal (target self))
+(allow sysctl-read)
+(allow file-read* file-map-executable
+    (subpath "/System") (subpath "/usr/bin") (subpath "/usr/lib")
+    (subpath "/usr/share") (subpath "/bin") (subpath "/sbin")
+    (subpath "/Library/Apple")
+    (subpath (param "WORKSPACE")))
+(allow file-read-metadata)
+(allow file-read* file-write* file-map-executable (subpath (param "SESSION_HOME")))
+(allow file-read* file-write* (subpath (param "WORKSPACE")))
+(allow file-read* file-write-data file-ioctl
+    (literal "/dev/tty") (literal "/dev/null") (literal "/dev/zero")
+    (literal "/dev/random") (literal "/dev/urandom") (subpath "/dev/fd"))
+
+(allow file-ioctl (regex #"^/dev/ttys[0-9]+$"))
+
+(allow file-read-data (literal "/dev"))

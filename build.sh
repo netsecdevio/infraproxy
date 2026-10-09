@@ -7,8 +7,8 @@ SIGNING_IDENTITY="Developer ID Application: Doug Dowenr (J77629PP5S)"
 KEYCHAIN_PROFILE="InfraProxy"
 BUNDLE_ID="com.dynadobe.infraproxy"
 ENTITLEMENTS="infraproxy.entitlements"
-APP_VERSION="2.7.0"
-APP_BUILD="10"
+APP_VERSION="2.8.0"
+APP_BUILD="11"
 SPARKLE_FEED="https://github.com/netsecdevio/infravibe/releases/latest/download/appcast.xml"
 
 # Parse arguments
@@ -50,7 +50,7 @@ swiftc -target "$ARCH-apple-macosx15.5" -o "$BUILD_SLICES/InfraProxy-$ARCH" \
     Sources/RemoteAccess.swift \
     Sources/AppUpdater.swift \
     Sources/AppSettings.swift \
-    Sources/BrowserServer.swift \
+    Sources/BrowserKeys.swift Sources/AgentAccess.swift Sources/TerminalSession.swift Sources/BrowserServer.swift \
     Sources/BrowserDashboard.swift \
     Sources/main.swift \
     -framework Cocoa \
@@ -76,6 +76,7 @@ cp Web/node_modules/@xterm/addon-fit/LICENSE InfraProxy.app/Contents/Resources/x
 ditto Vendor/Sparkle/Sparkle.framework InfraProxy.app/Contents/Frameworks/Sparkle.framework
 cp Vendor/Sparkle/LICENSE InfraProxy.app/Contents/Resources/Sparkle-LICENSE.txt
 cp Resources/VibeTunnel-LICENSE.txt InfraProxy.app/Contents/Resources/
+cp Resources/terminal.sb InfraProxy.app/Contents/Resources/
 cp THIRD_PARTY_NOTICES.md InfraProxy.app/Contents/Resources/
 
 # Copy executable
@@ -121,7 +122,9 @@ cat > InfraProxy.app/Contents/Info.plist << EOF
     <key>CFBundleIdentifier</key>
     <string>${BUNDLE_ID}</string>
     <key>CFBundleName</key>
-    <string>InfraProxy</string>
+    <string>infravibe</string>
+    <key>CFBundleDisplayName</key>
+    <string>infravibe</string>
     <key>CFBundleShortVersionString</key>
     <string>${APP_VERSION}</string>
     <key>CFBundleVersion</key>

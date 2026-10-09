@@ -25,6 +25,8 @@ jobs:
         run: node --check Web/app.js
       - name: Universal application build
         run: bash build.sh
+      - name: Sandbox boundaries
+        run: python3 Tests/sandbox.py
       - name: Browser integration
         run: python3 Tests/browser-integration.py
       - name: Whitespace check

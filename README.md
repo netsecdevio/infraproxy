@@ -1,6 +1,12 @@
 # infravibe
 
-Formerly InfraProxy. Published releases still use the `InfraProxy.app` bundle  while the rebrand is in development. Existing bundle identifiers and settings paths are retained for upgrade compatibility.
+Formerly InfraProxy. The public product and Homebrew cask are now **infravibe**. The signed bundle filename `InfraProxy.app`, bundle identifier, and settings paths remain stable for upgrades.
+
+## Standalone release 2.8
+
+Browser terminals now run in an approved-workspace sandbox with a private temporary home. Network access and inherited host credentials are blocked. SSH authentication reads option-free Ed25519 keys from the Mac user's `~/.ssh/authorized_keys`. Agent access uses separate expiring local grants. SPIFFE/SPIRE is deferred.
+
+This release does not include terminal networking, attachment to host tmux sessions, native terminal forwarding, or the expanded quick-start command composer. See [release notes](RELEASE_NOTES.md) and [browser access/security boundaries](BROWSER_ACCESS.md) before enabling remote access.
 
 ## Contributing
 
@@ -286,4 +292,4 @@ Homebrew requires explicit trust for third-party package definitions. The comman
 
 If you previously added `netsecdevio/infraproxy`, add the new tap using the commands above. Only remove the old tap with `brew untap netsecdevio/infraproxy` after migrating any installed casks; do not force-remove a tap with installed packages.
 
-The cask is named `infravibe`. The current stable 2.7.0 artifact still contains `InfraProxy.app` and its original interface; the full application rebrand is not yet released. The signed bundle is intentionally not rewritten by Homebrew.
+The cask is named `infravibe`. The stable artifact retains the `InfraProxy.app` filename for updater compatibility; its interface is branded infravibe. The signed bundle is intentionally not rewritten by Homebrew.

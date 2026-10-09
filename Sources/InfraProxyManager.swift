@@ -5,6 +5,8 @@ import SwiftUI
 
 class InfraProxyManager: NSObject, ObservableObject {
     internal let remoteAccess = RemoteAccessModel()
+    internal let browserKeys = BrowserKeys(authorizedFile: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ssh/authorized_keys"))
+    internal let agentAccess = AgentAccess(file: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/InfraProxy/AgentAccess.json"))
     internal let browserDashboard = BrowserDashboard()
     private var menuPopover: NSPopover?
     internal var dashboardWindow: NSWindow?
@@ -66,7 +68,7 @@ class InfraProxyManager: NSObject, ObservableObject {
         remoteAccess.start()
         browserDashboard.manager = self
         startStatusRefresh()
-        log(.info, "InfraProxy started")
+        log(.info, "infravibe started")
     }
 
     deinit {
@@ -83,7 +85,7 @@ class InfraProxyManager: NSObject, ObservableObject {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "server.rack", accessibilityDescription: "InfraProxy")
+            button.image = BrandMark.image
             button.image?.size = NSSize(width: 18, height: 18)
         }
 
@@ -103,7 +105,7 @@ class InfraProxyManager: NSObject, ObservableObject {
         let host = NSHostingController(rootView: MenuBarPanel(manager: self, operations: operations, remote: remoteAccess))
         // Keep AppKit in charge of the anchored frame when SwiftUI state changes.
         host.sizingOptions = []
-        let size = NSSize(width: 400, height: 554)
+        let size = NSSize(width: 350, height: 400)
         host.view.frame = NSRect(origin: .zero, size: size)
         panel.contentViewController = host
         panel.contentSize = size
@@ -255,7 +257,7 @@ class InfraProxyManager: NSObject, ObservableObject {
         menu.addItem(NSMenuItem.separator())
 
         // Settings, logs, and about
-        let aboutItem = NSMenuItem(title: "About InfraProxy", action: #selector(showAbout), keyEquivalent: "")
+        let aboutItem = NSMenuItem(title: "About infravibe", action: #selector(showAbout), keyEquivalent: "")
         aboutItem.target = self
         menu.addItem(aboutItem)
         menu.addItem(appUpdater.menuItem())
@@ -278,7 +280,7 @@ class InfraProxyManager: NSObject, ObservableObject {
         menu.addItem(NSMenuItem.separator())
 
         // Quit
-        let quitItem = NSMenuItem(title: "Quit InfraProxy", action: #selector(quitApp), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: "Quit infravibe", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
 
@@ -382,7 +384,7 @@ class InfraProxyManager: NSObject, ObservableObject {
     private func updateMenuBarIcon() {
         guard let button = statusItem?.button else { return }
 
-        button.image = NSImage(systemSymbolName: "server.rack", accessibilityDescription: "InfraProxy")
+        button.image = BrandMark.image
         button.image?.size = NSSize(width: 18, height: 18)
 
         let enabledServices = configuration.services.filter { $0.isEnabled }
@@ -955,7 +957,7 @@ class InfraProxyManager: NSObject, ObservableObject {
             isRunning = true
             rebuildMenu()
             log(.info, "Started IA Proxy process with PID: \(process.processIdentifier)")
-            showNotification(title: "IA Proxy Starting", message: "InfraProxy process started")
+            showNotification(title: "IA Proxy Starting", message: "infravibe process started")
         } catch {
             log(.error, "Failed to start IA Proxy process: \(error.localizedDescription)")
             showError(message: "Failed to start IA Proxy: \(error.localizedDescription)")
@@ -976,13 +978,13 @@ class InfraProxyManager: NSObject, ObservableObject {
             guard let self = self, let button = self.statusItem?.button else { return }
 
             if isVisible {
-                button.image = NSImage(systemSymbolName: "server.rack", accessibilityDescription: "InfraProxy")
+                button.image = BrandMark.image
                 button.image?.size = NSSize(width: 18, height: 18)
                 button.image = button.image?.withSymbolConfiguration(
                     NSImage.SymbolConfiguration(paletteColors: [.systemOrange])
                 )
             } else {
-                button.image = NSImage(systemSymbolName: "server.rack", accessibilityDescription: "InfraProxy")
+                button.image = BrandMark.image
                 button.image?.size = NSSize(width: 18, height: 18)
                 button.image = button.image?.withSymbolConfiguration(
                     NSImage.SymbolConfiguration(paletteColors: [.systemGray])

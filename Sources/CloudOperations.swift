@@ -45,12 +45,12 @@ struct CloudResource: Identifiable {
     let detail: String
     static func parse(_ data: Data, kind: CloudResourceKind) throws -> [CloudResource] {
         guard let rows = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw NSError(domain: "InfraProxy", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unexpected resource response"])
+            throw NSError(domain: "infravibe", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unexpected resource response"])
         }
         return try rows.map { row in
             let metadata = row["metadata"] as? [String: Any] ?? [:]
             guard let name = (row["name"] ?? metadata["name"]) as? String else {
-                throw NSError(domain: "InfraProxy", code: 2, userInfo: [NSLocalizedDescriptionKey: "Resource is missing its name"])
+                throw NSError(domain: "infravibe", code: 2, userInfo: [NSLocalizedDescriptionKey: "Resource is missing its name"])
             }
             let labels = metadata["labels"] as? [String: String] ?? [:]
             let location = (row["location"] as? String) ?? (row["region"] as? String) ?? labels["cloud.googleapis.com/location"] ?? "Global"
@@ -291,7 +291,7 @@ final class GoogleCloudModel: ObservableObject {
             let args = [path, "compute", "ssh", instance.name, "--account=" + account, "--project=" + project, "--zone=" + instance.shortZone, "--tunnel-through-iap"]
             let command = args.map(OperationsCommand.quote).joined(separator: " ")
             let terminal = PreferredTerminal.selected
-            message = terminal.launch(command: command) ? "SSH opened in \(terminal.title) for \(instance.name)." : "Could not open \(terminal.title). Check its installation and macOS Automation permission for InfraProxy."
+            message = terminal.launch(command: command) ? "SSH opened in \(terminal.title) for \(instance.name)." : "Could not open \(terminal.title). Check its installation and macOS Automation permission for infravibe."
             return
         }
         busy = true

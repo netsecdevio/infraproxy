@@ -1,3 +1,4 @@
+import UserNotifications
 import Cocoa
 import SwiftUI
 
@@ -51,7 +52,7 @@ struct AdvancedSettingsView: View {
                 SettingsSection("Apps") {
                     HStack {
                         Text("Preferred terminal"); Spacer()
-                        Button("Test") { terminalMessage = terminal.launch(command: "printf '\\nInfraProxy terminal ready.\\n'") ? "Opened \(terminal.title)." : "Could not open \(terminal.title). Check its installation and macOS Automation permission." }
+                        Button("Test") { terminalMessage = terminal.launch(command: "printf '\\ninfravibe terminal ready.\\n'") ? "Opened \(terminal.title)." : "Could not open \(terminal.title). Check its installation and macOS Automation permission." }
                         Picker("Preferred terminal", selection: $terminal) { ForEach(PreferredTerminal.allCases) { item in Text(item.title + (item.installed ? "" : " · Not installed")).tag(item) } }.labelsHidden().frame(width: 180)
                     }
                     Text("Used for Google Cloud IAP SSH connections. Browser terminals use your Mac user’s login shell.").font(.caption).foregroundStyle(.secondary)
@@ -66,13 +67,13 @@ struct AdvancedSettingsView: View {
                 }
                 SettingsSection("Advanced") {
                     HStack { Text("Debug mode"); Spacer(); Toggle("Debug mode", isOn: $debugMode).labelsHidden().toggleStyle(.switch) }
-                    Text("Add operational diagnostics to the app log. Browser terminal content and access keys are never recorded.").font(.caption).foregroundStyle(.secondary)
+                    Text("Add operational diagnostics to the app log. Access keys are never logged. Bounded terminal output is retained separately for session previews.").font(.caption).foregroundStyle(.secondary)
                     Divider()
                     HStack { Text("Application logs"); Spacer(); Button("Show Logs", action: manager.showLogs) }
                     HStack { Text("Outbound proxies and launch services"); Spacer(); Button("Configure…", action: manager.showProxySettings) }
                 }
                 SettingsSection("Browser session lifecycle") {
-                    Text("Browser sessions expire after 8 hours. Terminals end when their browser connection closes. Stopping the server, quitting InfraProxy, or rotating its key ends all browser terminals.").font(.callout).foregroundStyle(.secondary)
+                    Text("Browser logins expire after 8 hours. Closing the browser detaches from running sessions. Shells have an 8-hour maximum lifetime. Stopping the server or quitting ends running terminals; rotating the browser key ends human terminals.").font(.callout).foregroundStyle(.secondary)
                     Text("Inbound sharing is off until you start it. It is never restored automatically on launch.").font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(28)
@@ -85,7 +86,7 @@ struct AboutSettingsView: View {
         ScrollView {
             VStack(spacing: 18) {
                 Image(nsImage: NSApp.applicationIconImage).resizable().scaledToFit().frame(width: 110, height: 110).padding(.top, 20)
-                Text("InfraProxy").font(.system(size: 29, weight: .bold))
+                Text("infravibe").font(.system(size: 29, weight: .bold))
                 Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""))").font(.caption).foregroundStyle(.secondary)
                 Text("Your infrastructure, connected.").font(.headline).foregroundStyle(.secondary)
                 Text("Manage outbound infrastructure access and reach this Mac’s dashboard and terminals from your browser.").multilineTextAlignment(.center).foregroundStyle(.secondary).frame(maxWidth: 450)
@@ -103,8 +104,137 @@ struct AboutSettingsView: View {
                 Button("Open source notices") {
                     if let url = Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "md") { NSWorkspace.shared.open(url) }
                 }.buttonStyle(.link)
-                Text("MIT Licensed · InfraProxy contributors").font(.caption).foregroundStyle(.secondary).padding(.bottom, 24)
+                Text("MIT Licensed · infravibe contributors").font(.caption).foregroundStyle(.secondary).padding(.bottom, 24)
             }.frame(maxWidth: .infinity).padding(24)
+        }
+    }
+}
+
+struct AgentAccessView: View {
+    @ObservedObject var model: AgentAccess
+    @ObservedObject var browser: BrowserDashboard
+    @State private var name = ""
+    @State private var hours = 24.0
+    @State private var message = ""
+    @State private var pending: AgentGrant?
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                SettingsSection("Connect your agent") {
+                    Text("Give each agent its own identity. Start with device discovery; terminal control requires your separate approval on this Mac.")
+                    LabeledContent("MCP endpoint", value: browser.localURL.map { $0.absoluteString + "/mcp" } ?? "Start the browser server in Dashboard")
+                    Text("For another device, use your Tailscale HTTPS URL with /mcp. Configure its Authorization header as Bearer followed by the token. Never put tokens in URLs or prompts.").font(.caption).foregroundStyle(.secondary)
+                    TextField("Agent name, e.g. My coding assistant", text: $name)
+                    Picker("Credential lifetime", selection: $hours) { Text("1 hour").tag(1.0); Text("24 hours").tag(24.0); Text("7 days").tag(168.0) }
+                    Button("Create read-only token and copy") {
+                        if let token = model.create(name: name, hours: hours) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(token, forType: .string); name = ""; message = "Token copied once. Save it in your agent client's secret configuration." }
+                        else { message = "Enter a name or remove an old grant (maximum 32)." }
+                    }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary) }
+                }
+                SettingsSection("Agent permissions") {
+                    if model.all.isEmpty { Text("No agents authorized").foregroundStyle(.secondary) }
+                    ForEach(model.all) { grant in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack { Text(grant.name).bold(); Spacer(); Button("Revoke") { model.revoke(grant.id) } }
+                            Text(grant.expires <= Date() ? "Expired" : grant.canControl ? "Terminal control until \(grant.terminalUntil!.formatted())" : "Read-only device discovery").font(.caption)
+                            Text("Credential expires \(grant.expires.formatted())").font(.caption).foregroundStyle(.secondary)
+                            if grant.requestedControl { Label("Agent requested terminal control", systemImage: "hand.raised").foregroundStyle(.orange) }
+                            Button("Approve terminal control for 1 hour…") { pending = grant }.disabled(grant.expires <= Date())
+                        }.padding(.vertical, 4)
+                    }
+                }
+                SettingsSection("Recent agent activity") {
+                    Text("Records identity, tool, outcome, and time. Commands, terminal content, and credentials are omitted.").font(.caption).foregroundStyle(.secondary)
+                    ForEach(model.activity.prefix(30)) { event in
+                        VStack(alignment: .leading) { Text("\(event.agent) · \(event.action) · \(event.outcome)"); Text(event.date.formatted()).font(.caption).foregroundStyle(.secondary) }
+                    }
+                }
+            }.padding(28)
+        }
+        .alert("Grant terminal control?", isPresented: Binding(get: { pending != nil }, set: { if !$0 { pending = nil } })) {
+            Button("Cancel", role: .cancel) { pending = nil }
+            Button("Approve for 1 hour", role: .destructive) { if let pending { model.approveControl(pending.id) }; pending = nil }
+        } message: { Text("This agent can run commands inside its approved workspace sandbox. Network access and inherited host credentials are blocked. Revoking access stops its infravibe terminal sessions. Child processes remain subject to the same sandbox.") }
+    }
+}
+
+struct BrowserKeySettings: View {
+    @ObservedObject var model: BrowserKeys
+    @State private var message = ""
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("SSH authorized keys").font(.headline)
+            Text("Trust is read from ~/.ssh/authorized_keys on this Mac. Only option-free Ed25519 entries are currently supported; entries with restrictions are rejected rather than weakened. Manage this file through your usual SSH administration workflow.").font(.caption).foregroundStyle(.secondary)
+            Button("Open SSH folder") { NSWorkspace.shared.open(FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ssh")) }
+            ForEach(model.all) { key in
+                HStack { VStack(alignment: .leading) { Text(key.label); Text(key.id).font(.caption2).textSelection(.enabled) }; Spacer() }
+            }
+            if !message.isEmpty { Text(message).font(.caption).foregroundStyle(.secondary) }
+        }
+    }
+}
+
+// Template glyph stays readable in both light and dark macOS menu bars.
+enum BrandMark {
+    static var image: NSImage {
+        let image = NSImage(size: NSSize(width: 22, height: 18), flipped: false) { _ in
+            NSColor.labelColor.setStroke()
+            let path = NSBezierPath(); path.lineWidth = 3.5; path.lineCapStyle = .round; path.lineJoinStyle = .round
+            path.move(to: NSPoint(x: 2, y: 6)); path.line(to: NSPoint(x: 4, y: 2))
+            path.move(to: NSPoint(x: 7, y: 9)); path.line(to: NSPoint(x: 10, y: 2))
+            path.move(to: NSPoint(x: 13, y: 11)); path.line(to: NSPoint(x: 16, y: 2)); path.line(to: NSPoint(x: 20, y: 16))
+            path.stroke(); return true
+        }
+        image.isTemplate = true; image.accessibilityDescription = "infravibe"; return image
+    }
+}
+
+
+struct SessionNotificationSettings: View {
+    @ObservedObject var browser: BrowserDashboard
+    @AppStorage("sessionNotifications") private var enabled = false
+    @AppStorage("notifySessionStart") private var starts = false
+    @AppStorage("notifySessionEnd") private var ends = false
+    @AppStorage("sessionNotificationSound") private var sound = false
+    @State private var authorization = "Checking…"
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                SettingsSection("Session notifications") {
+                    Toggle("Show session notifications", isOn: $enabled)
+                    LabeledContent("macOS permission", value: authorization)
+                    LabeledContent("Session events", value: browser.running ? "Connected" : "Server stopped")
+                    Text("Notifications appear on this Mac. Session output, commands, and working directories are excluded.").font(.caption).foregroundStyle(.secondary)
+                }
+                SettingsSection("Notification types") {
+                    Toggle("Session starts", isOn: $starts)
+                    Toggle("Session ends · includes exit code", isOn: $ends)
+                    Text("Per-command failures, completion timing, and terminal bell alerts require shell event integration and are not available yet.").font(.caption).foregroundStyle(.secondary)
+                }.disabled(!enabled)
+                SettingsSection("Notification behavior") {
+                    Toggle("Play sound", isOn: $sound).disabled(!enabled)
+                    Text("Banner style and Notification Center visibility are controlled in macOS System Settings → Notifications → infravibe.").font(.caption).foregroundStyle(.secondary)
+                    Button("Refresh permission status", action: refresh)
+                }
+            }.padding(28)
+        }.onAppear(perform: refresh).onChange(of: enabled) { _, value in
+            if value {
+                UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in refresh() }
+            }
+        }
+    }
+    private func refresh() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            let text: String
+            switch settings.authorizationStatus {
+            case .authorized: text = "Allowed"
+            case .denied: text = "Blocked in System Settings"
+            case .notDetermined: text = "Not requested"
+            case .provisional: text = "Quiet delivery"
+            @unknown default: text = "Unknown"
+            }
+            DispatchQueue.main.async { authorization = text }
         }
     }
 }
