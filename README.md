@@ -33,6 +33,12 @@ local web services; they do not provide VibeTunnel's browser terminal.
 The menu design and sharing workflow draw inspiration from
 [VibeTunnel](https://github.com/amantus-ai/vibetunnel); see [notices](THIRD_PARTY_NOTICES.md).
 
+## Architecture
+
+Release 2.6.1 and later are Universal 2: one app runs natively on both Apple Silicon
+(`arm64`) and Intel (`x86_64`) Macs running macOS 15.5 or later. The build compiles
+both architectures and verifies every bundled executable, including Sparkle helpers.
+
 ## In-app updates (2.6.0+)
 
 Use **Check for Updates…** in the menu bar or **Dashboard → Updates**. InfraProxy checks daily and offers signed updates for installation and relaunch. Automatic checks can be disabled in the Updates tab. Install v2.6.0 once to enable this on older installations.

@@ -7,8 +7,8 @@ SIGNING_IDENTITY="Developer ID Application: Doug Dowenr (J77629PP5S)"
 KEYCHAIN_PROFILE="InfraProxy"
 BUNDLE_ID="com.dynadobe.infraproxy"
 ENTITLEMENTS="infraproxy.entitlements"
-APP_VERSION="2.6.0"
-APP_BUILD="8"
+APP_VERSION="2.6.1"
+APP_BUILD="9"
 SPARKLE_FEED="https://github.com/netsecdevio/infraproxy/releases/latest/download/appcast.xml"
 
 # Parse arguments
@@ -33,8 +33,11 @@ echo "Building InfraProxy..."
 # Clean previous builds
 rm -rf InfraProxy.app
 
-# Compile Swift files directly
-swiftc -target "$(uname -m)-apple-macosx15.5" -o InfraProxy \
+# Compile each supported architecture, then sign the combined Universal 2 binary.
+BUILD_SLICES=$(mktemp -d)
+trap 'rm -rf "$BUILD_SLICES"' EXIT
+for ARCH in arm64 x86_64; do
+swiftc -target "$ARCH-apple-macosx15.5" -o "$BUILD_SLICES/InfraProxy-$ARCH" \
     Sources/ProxyModels.swift \
     Sources/LaunchctlServiceManager.swift \
     Sources/InfraProxyManager.swift \
@@ -50,6 +53,9 @@ swiftc -target "$(uname -m)-apple-macosx15.5" -o InfraProxy \
     -framework UserNotifications \
     -F Vendor/Sparkle -framework Sparkle \
     -Xlinker -rpath -Xlinker @executable_path/../Frameworks
+done
+lipo -create "$BUILD_SLICES/InfraProxy-arm64" "$BUILD_SLICES/InfraProxy-x86_64" -output InfraProxy
+
 
 # Create app bundle
 mkdir -p InfraProxy.app/Contents/MacOS
@@ -136,6 +142,7 @@ cat > InfraProxy.app/Contents/Info.plist << EOF
 </plist>
 EOF
 
+bash scripts/verify-architectures.sh InfraProxy.app
 echo "✅ InfraProxy.app created successfully"
 
 # Code signing and notarization
