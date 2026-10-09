@@ -93,6 +93,26 @@ The dashboard also shows the Teleport credential-expiry countdown and per-port T
 
 ## Installation
 
+### Homebrew
+
+```bash
+brew tap netsecdevio/infraproxy https://github.com/netsecdevio/infraproxy
+brew install --cask netsecdevio/infraproxy/infraproxy
+```
+
+The cask downloads the same signed, notarized Universal 2 release and verifies
+its SHA-256 checksum. macOS 15.5 or later is required. Optional provider tools
+are installed separately. Use the in-app updater, or:
+
+```bash
+brew update
+brew upgrade --cask --greedy infraproxy
+```
+
+An existing manually installed copy should be updated in-app; Homebrew will not
+overwrite it without an explicit migration. Uninstalling the cask preserves
+configuration and session history.
+
 ### Option 1: Download Release
 1. Download `InfraProxy.app` from [Releases](../../releases)
 2. Move to `/Applications` folder
