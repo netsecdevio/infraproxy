@@ -1,6 +1,8 @@
+# frozen_string_literal: true
+
 cask "infravibe" do
-  version "2.9.0"
-  sha256 "ef2a3ed08793944e81732d15f1a2c25c933f9a580ddc0721a1117d3834a1fa21"
+  version "2.10.0"
+  sha256 "a15c54ccd6ac2dfe46c6c5e71b58b992c81af5bc8ffd59528cb587b67f585323"
 
   url "https://github.com/netsecdevio/infravibe/releases/download/v#{version}/InfraProxy-#{version}.dmg"
   name "infravibe"
