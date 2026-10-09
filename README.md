@@ -299,8 +299,22 @@ The cask is named `infravibe`. The stable artifact retains the `InfraProxy.app` 
 Open **DevOps** in Operations, or click **DevOps** in the menu panel. infravibe
 includes native monitoring adapted from Barklarm: GitHub Actions, Azure DevOps,
 Bitbucket Pipelines, CCTray, Datadog, Sentry, New Relic, Opsgenie, Graylog and Grafana.
-Add read-only monitors or import a Barklarm JSON export and review it before
-starting. Credentials are saved in macOS Keychain. Checks run every 60 seconds;
-failure/recovery notifications are opt-in. HTTPS is required.
+Use **Add monitor** for guided provider setup, credential guidance, resource discovery,
+a connection test and a final review. Paste a supported provider link into setup or
+drop it onto DevOps. Group, search, filter, edit, duplicate, mute or pause monitors.
+Discovery shows the first page; direct resource entry remains available.
+
+**Settings & backups** configures automatic checks (1–60 minutes), notifications,
+login at startup and a global issue endpoint. Individual monitors can override the
+issue destination. **Create issue** reviews the failure payload before sending one
+POST request; it never sends your provider credentials. Manual refresh works while
+automatic checks are paused.
+
+Credentials and preferences stay in macOS Keychain. Import reviews Barklarm JSON,
+native templates and encrypted backups before merging or replacing configuration.
+**Encrypted backup** includes credentials using password-protected AES-GCM;
+**Export template** omits credential fields and URL queries and restores monitors
+paused. Keep the backup password separately. HTTPS and certificate validation are
+always required. Existing 2.9 monitor IDs and credentials migrate automatically.
 
 See [integration details and validation limits](Vendor/BARKLARM.md).

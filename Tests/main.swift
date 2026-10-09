@@ -263,3 +263,133 @@ if ProcessInfo.processInfo.environment["INFRAVIBE_DEVOPS_LIVE_TEST"] == "1" {
     while !liveDone && Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
     assert(liveDone && livePassed)
 }
+
+let legacyID = UUID()
+let legacyConfig = Data("[{\"id\":\"\(legacyID.uuidString)\",\"type\":\"githubAction\",\"fields\":{\"owner\":\"owner\",\"repo\":\"repo\",\"workflowId\":\"ci.yml\",\"authToken\":\"secret-fixture\"},\"muted\":true}]".utf8)
+let migratedConfig = try DevOpsConfiguration.decode(legacyConfig)
+assert(migratedConfig.monitors[0].id == legacyID && migratedConfig.monitors[0].muted && migratedConfig.monitors[0].enabled)
+assert(migratedConfig.monitors[0].group.isEmpty && migratedConfig.monitors[0].fields["authToken"] == "secret-fixture")
+var backupConfig = migratedConfig
+backupConfig.preferences.refreshSeconds = 180
+backupConfig.preferences.automaticRefresh = false
+backupConfig.preferences.issueEndpoint = "https://issues.example.test/create?key=private"
+backupConfig.monitors[0].group = "Production"
+let backupBytes = try DevOpsBackup.seal(backupConfig, password: "correct horse battery staple")
+assert(!String(data: backupBytes, encoding: .utf8)!.contains("secret-fixture"))
+let restoredConfig = try DevOpsBackup.open(backupBytes, password: "correct horse battery staple")
+assert(restoredConfig.monitors == backupConfig.monitors && restoredConfig.preferences == backupConfig.preferences)
+assert((try? DevOpsBackup.open(backupBytes, password: "incorrect horse battery staple")) == nil)
+var tamperedEnvelope = try JSONDecoder().decode(DevOpsBackup.Envelope.self, from: backupBytes)
+var tamperedCiphertext = tamperedEnvelope.sealed; tamperedCiphertext[0] ^= 1
+let tamperedBackup = try JSONEncoder().encode(DevOpsBackup.Envelope(format: tamperedEnvelope.format, version: 1, rounds: tamperedEnvelope.rounds, salt: tamperedEnvelope.salt, sealed: tamperedCiphertext))
+assert((try? DevOpsBackup.open(tamperedBackup, password: "correct horse battery staple")) == nil)
+let templateConfig = backupConfig.template()
+assert(templateConfig.monitors[0].fields["authToken"] == nil && !templateConfig.monitors[0].enabled)
+assert(!templateConfig.preferences.issueEndpoint.contains("private"))
+assert(try! DevOpsConfiguration.decode(JSONEncoder().encode(templateConfig)).monitors == templateConfig.monitors)
+assert((try? DevOpsConfiguration(monitors: [backupConfig.monitors[0],backupConfig.monitors[0]]).validated()) == nil)
+let parsedLink = try DevOpsSetup.fromLink("https://github.com/example/service/actions/workflows/build.yml?query=branch%3Amain")
+assert(parsedLink.type == "githubAction" && parsedLink.fields["workflowId"] == "build.yml")
+assert((try? DevOpsSetup.fromLink("https://github.com.attacker.test/example/service/actions/workflows/build.yml")) == nil)
+assert((try? DevOpsSetup.fromLink("https://user:secret@github.com/example/service/actions/workflows/build.yml")) == nil)
+assert(try! DevOpsSetup.fromLink("https://dev.azure.com/org/project/_build?definitionId=123").fields["pipelineId"] == "123")
+let discoveryRequest = try DevOpsDiscovery.request(DevOpsMonitor(type:"githubAction",fields:["owner":"owner","repo":"repo","authToken":"secret-fixture"]))
+assert(discoveryRequest.url!.path == "/repos/owner/repo/actions/workflows")
+let discoveryChoices = try DevOpsDiscovery.choices(Data(#"{"workflows":[{"id":1,"name":"CI"},{"id":1,"name":"duplicate"},{"id":2,"name":"Release"}]}"#.utf8),type:"githubAction")
+assert(discoveryChoices.count == 2 && discoveryChoices[0].id == "1")
+let issueResult = DevOpsResult(health:.failed,detail:"Build failed",link:URL(string:"https://ci.example.test/run/1?token=private"))
+let preparedIssue = try DevOpsIssue.prepare(monitor:backupConfig.monitors[0],result:issueResult,preferences:backupConfig.preferences)
+let issueText = String(data:preparedIssue.body,encoding:.utf8)!
+assert(!issueText.contains("secret-fixture") && !issueText.contains("private") && preparedIssue.request.httpMethod == "POST")
+assert((try? DevOpsIssue.prepare(monitor:backupConfig.monitors[0],result:DevOpsResult(health:.healthy,detail:"ok",link:nil),preferences:backupConfig.preferences)) == nil)
+assert((try? DevOpsIssue.prepare(monitor:backupConfig.monitors[0],result:DevOpsResult(health:.failed,detail:"old",link:nil,checked:Date(timeIntervalSinceNow:-500)),preferences:backupConfig.preferences)) == nil)
+print("PASS: legacy upgrade migration, encrypted backup round-trip/wrong password/tamper rejection, paused credential-free templates, monitor IDs, provider link parsing/discovery, reviewed issue payload redaction and freshness")
+var notificationPreferences = DevOpsPreferences()
+notificationPreferences.notifications = true
+var notificationMonitor = DevOpsMonitor(type:"githubAction",fields:[:])
+assert(DevOpsNotificationPolicy.shouldNotify(previous:nil,current:.failed,monitor:notificationMonitor,preferences:notificationPreferences))
+assert(!DevOpsNotificationPolicy.shouldNotify(previous:.failed,current:.failed,monitor:notificationMonitor,preferences:notificationPreferences))
+notificationMonitor.muted = true
+assert(!DevOpsNotificationPolicy.shouldNotify(previous:.healthy,current:.failed,monitor:notificationMonitor,preferences:notificationPreferences))
+notificationMonitor.muted = false; notificationPreferences.notifyAllChanges = true
+assert(DevOpsNotificationPolicy.shouldNotify(previous:.healthy,current:.unknown,monitor:notificationMonitor,preferences:notificationPreferences))
+notificationMonitor.enabled = false
+assert(!DevOpsNotificationPolicy.shouldNotify(previous:.healthy,current:.failed,monitor:notificationMonitor,preferences:notificationPreferences))
+print("PASS: initial failures, duplicate suppression, per-monitor mute/pause and all-state notification policy")
+
+final class MemoryDevOpsStore: DevOpsStoring {
+    var data: Data?
+    var failWrite = false
+    init(_ data: Data?) { self.data = data }
+    func read() throws -> Data? { data }
+    func write(_ value: Data) throws { if failWrite { throw DevOpsError.invalidConfiguration }; data = value }
+}
+let devOpsDefaultsName = "infravibe-tests-" + UUID().uuidString
+let devOpsDefaults = UserDefaults(suiteName: devOpsDefaultsName)!
+defer { devOpsDefaults.removePersistentDomain(forName: devOpsDefaultsName) }
+let devOpsStore = MemoryDevOpsStore(try JSONEncoder().encode(backupConfig))
+let devOpsModel = DevOpsModel(store:devOpsStore,defaults:devOpsDefaults,timersEnabled:false,check:{ _ in DevOpsResult(health:.healthy,detail:"Fixture",link:nil) })
+devOpsModel.load()
+assert(devOpsModel.loaded && devOpsModel.monitors[0].id == legacyID && !devOpsModel.preferences.automaticRefresh)
+assert(!devOpsModel.refreshing && devOpsModel.results.isEmpty)
+devOpsModel.refresh()
+let devOpsDeadline = Date().addingTimeInterval(3)
+while devOpsModel.refreshing && Date() < devOpsDeadline { RunLoop.main.run(until:Date().addingTimeInterval(0.02)) }
+assert(devOpsModel.results[legacyID]?.health == .healthy)
+var pausedMonitor = devOpsModel.monitors[0]; pausedMonitor.enabled = false; pausedMonitor.muted = false
+try devOpsModel.save([pausedMonitor])
+assert(!devOpsModel.monitors[0].enabled && !devOpsModel.monitors[0].muted)
+assert(try! DevOpsConfiguration.decode(devOpsStore.data!).monitors[0] == pausedMonitor)
+devOpsStore.failWrite = true
+assert((try? devOpsModel.save([])) == nil && devOpsModel.monitors.count == 1)
+let brokenModel = DevOpsModel(store:MemoryDevOpsStore(Data("invalid".utf8)),defaults:devOpsDefaults,timersEnabled:false)
+brokenModel.load()
+assert(!brokenModel.loaded && (try? brokenModel.save([])) == nil)
+print("PASS: configuration load/poll/pause/mute persistence, manual refresh while paused, failed-write atomicity and corrupt-store protection")
+
+// Transport tests never contact an issue service or use operator credentials.
+final class DevOpsFixtureProtocol: URLProtocol {
+    static var status = 201
+    static var requests: [URLRequest] = []
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        Self.requests.append(request)
+        client?.urlProtocol(self, didReceive: HTTPURLResponse(url:request.url!,statusCode:Self.status,httpVersion:nil,headerFields:nil)!, cacheStoragePolicy:.notAllowed)
+        client?.urlProtocol(self, didLoad:Data("{}".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+var transportDone = false
+Task { @MainActor in
+    let transport = DevOpsHTTP(protocolClasses:[DevOpsFixtureProtocol.self])
+    do {
+        _ = try await transport.fetch(preparedIssue.request,acceptedStatus:200..<300)
+        assert(DevOpsFixtureProtocol.requests.count == 1 && DevOpsFixtureProtocol.requests[0].httpMethod == "POST")
+        assert(DevOpsFixtureProtocol.requests[0].value(forHTTPHeaderField:"Authorization") == nil)
+        DevOpsFixtureProtocol.status = 500
+        let failedResponse = try? await transport.fetch(preparedIssue.request,acceptedStatus:200..<300)
+        assert(failedResponse == nil)
+        assert(DevOpsFixtureProtocol.requests.count == 2) // No automatic retry on failure.
+        DevOpsFixtureProtocol.status = 302
+        let redirectResponse = try? await transport.fetch(preparedIssue.request,acceptedStatus:200..<300)
+        assert(redirectResponse == nil)
+        assert(DevOpsFixtureProtocol.requests.count == 3)
+        var redirectRejected = false
+        let session = URLSession(configuration:.ephemeral)
+        transport.urlSession(session,task:session.dataTask(with:preparedIssue.request),willPerformHTTPRedirection:HTTPURLResponse(url:preparedIssue.endpoint,statusCode:302,httpVersion:nil,headerFields:nil)!,newRequest:URLRequest(url:URL(string:"https://other.example.test")!)) { redirectRejected = $0 == nil }
+        session.invalidateAndCancel(); assert(redirectRejected)
+    } catch { assertionFailure("Issue transport fixture failed") }
+    transportDone = true
+}
+let transportDeadline = Date().addingTimeInterval(10)
+while !transportDone && Date() < transportDeadline { RunLoop.main.run(until:Date().addingTimeInterval(0.02)) }
+assert(transportDone)
+let cctrayChoices = try DevOpsDiscovery.choices(Data("<Projects><Project name=\"CI\"/><Project name=\"CI\"/></Projects>".utf8),type:"ccTray")
+assert(cctrayChoices.count == 1)
+print("PASS: issue POST success/failure/redirect rejection, no automatic retry, and duplicate resource IDs")
+
+if let fixturePath = ProcessInfo.processInfo.environment["INFRAVIBE_DEVOPS_BACKUP_FIXTURE"] {
+    try backupBytes.write(to:URL(fileURLWithPath:fixturePath),options:.atomic)
+}
