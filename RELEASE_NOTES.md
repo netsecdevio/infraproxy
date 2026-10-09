@@ -14,3 +14,5 @@ Terminal networking, attachment to existing host tmux sessions, native-terminal 
 All bundled executables are Universal2. The sandbox uses macOS sandbox-exec and fails closed if its executable or policy is unavailable; compatibility with unreleased macOS versions is not guaranteed. Authentication does not replace sandbox enforcement.
 
 Use Check for Updates to install and relaunch. Updating ends active terminals. Exited history retains up to 100 sessions with 256 KiB output each; clear saved sessions to remove it. History is protected by filesystem permissions, not application-level encryption. Do not intentionally store credentials in terminal output.
+
+Known update quirk: provider discovery may show Tailscale as unavailable immediately after Sparkle relaunch. Quit and reopen infravibe normally to refresh discovery. This workaround was verified; the underlying relaunch issue remains under investigation.
