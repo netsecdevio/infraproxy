@@ -38,7 +38,7 @@ struct UpdatesView: View {
             Button("Check for Updates…", action: updater.check).disabled(!updater.canCheck)
             Text("Installing an update restarts InfraProxy. Updates and the release feed are signed and verified before installation.")
                 .font(.caption).foregroundStyle(.secondary)
-            Link("View release history", destination: URL(string: "https://github.com/netsecdevio/infraproxy/releases")!)
+            Link("View release history", destination: URL(string: "https://github.com/netsecdevio/infravibe/releases")!)
             Spacer()
         }.padding(28)
     }

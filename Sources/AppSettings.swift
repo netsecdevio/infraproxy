@@ -80,7 +80,7 @@ struct AdvancedSettingsView: View {
     }
 }
 struct AboutSettingsView: View {
-    private let repository = "https://github.com/netsecdevio/infraproxy"
+    private let repository = "https://github.com/netsecdevio/infravibe"
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {

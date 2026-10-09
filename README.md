@@ -1,4 +1,10 @@
-# InfraProxy
+# infravibe
+
+Formerly InfraProxy. Published releases still use the `InfraProxy.app` bundle and `infraproxy` cask token while the rebrand is in development. Existing bundle identifiers and settings paths are retained for upgrade compatibility.
+
+## Contributing
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, and pull requests. See our [Code of Conduct](CODE_OF_CONDUCT.md) and [security policy](SECURITY.md). Report reproducible bugs or propose features through [GitHub Issues](https://github.com/netsecdevio/infravibe/issues).
 
 A macOS menu bar application for managing Identity Aware (IA) Proxy connections through Teleport. Provides secure access to internal resources via SOCKS proxy tunneling.
 
@@ -96,8 +102,8 @@ The dashboard also shows the Teleport credential-expiry countdown and per-port T
 ### Homebrew
 
 ```bash
-brew tap netsecdevio/infraproxy https://github.com/netsecdevio/infraproxy
-brew install --cask netsecdevio/infraproxy/infraproxy
+brew tap netsecdevio/infravibe https://github.com/netsecdevio/infravibe
+brew install --cask netsecdevio/infravibe/infraproxy
 ```
 
 The cask downloads the same signed, notarized Universal 2 release and verifies
@@ -120,8 +126,8 @@ configuration and session history.
 
 ### Option 2: Build from Source
 ```bash
-git clone https://github.com/netsecdevio/infraproxy.git
-cd infraproxy
+git clone https://github.com/netsecdevio/infravibe.git
+cd infravibe
 chmod +x build.sh
 ./build.sh
 ```

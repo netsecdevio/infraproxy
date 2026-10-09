@@ -13,7 +13,7 @@ For a release:
 5. Commit and tag the release. Create a GitHub **draft** release and upload the DMG, its SHA-256 file, and `appcast.xml` from that same output directory. Publish it as the latest release only after all assets are uploaded.
 6. Verify that the public stable feed URL serves the signed XML and its enclosure matches the release archive. Never edit signed XML or the archive after signing.
 
-Feed: `https://github.com/netsecdevio/infraproxy/releases/latest/download/appcast.xml`
+Feed: `https://github.com/netsecdevio/infravibe/releases/latest/download/appcast.xml`
 
 Each release carries its own signed feed. Marking the release latest advances the stable feed URL. Future releases must include `appcast.xml`; otherwise existing installations will be unable to check for updates. Older versions before 2.6.0 require one manual installation.
 

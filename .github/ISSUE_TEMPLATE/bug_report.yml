@@ -1,0 +1,29 @@
+name: Bug report
+description: Report a reproducible problem
+body:
+  - type: markdown
+    attributes:
+      value: "For vulnerabilities, use private reporting under Security. Remove credentials and private data from logs."
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: App version, macOS version, Intel or Apple Silicon, installation method, and relevant provider versions.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted logs or screenshots

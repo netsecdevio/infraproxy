@@ -6,7 +6,7 @@ APP=InfraProxy.app
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")
 OUTPUT="$PWD/dist/$VERSION"
 SIGNING_IDENTITY="Developer ID Application: Doug Dowenr (J77629PP5S)"
-RELEASE_URL="https://github.com/netsecdevio/infraproxy/releases/download/v$VERSION"
+RELEASE_URL="https://github.com/netsecdevio/infravibe/releases/download/v$VERSION"
 # Each feed must describe exactly the signed archive produced by this invocation.
 if [[ -e "$OUTPUT" ]]; then
     echo "Release output already exists: $OUTPUT. Move it aside before rebuilding." >&2
@@ -32,7 +32,7 @@ pathlib.Path(sys.argv[1]).write_text('<pre>' + html.escape(notes) + '</pre>')
 PY
 Vendor/Sparkle/bin/generate_appcast --account com.dynadobe.infraproxy \
     --maximum-deltas 0 --embed-release-notes --download-url-prefix "$RELEASE_URL/" \
-    --link "https://github.com/netsecdevio/infraproxy/releases/tag/v$VERSION" "$OUTPUT"
+    --link "https://github.com/netsecdevio/infravibe/releases/tag/v$VERSION" "$OUTPUT"
 Vendor/Sparkle/bin/sign_update --account com.dynadobe.infraproxy --verify "$OUTPUT/appcast.xml"
 (cd "$OUTPUT" && shasum -a 256 "InfraProxy-$VERSION.dmg" > "InfraProxy-$VERSION.dmg.sha256")
 echo "Ready to publish: $OUTPUT"

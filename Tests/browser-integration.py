@@ -1,9 +1,9 @@
-import base64, http.client, json, os, pathlib, re, socket, struct, subprocess, sys, tempfile, time
+import platform, base64, http.client, json, os, pathlib, re, socket, struct, subprocess, sys, tempfile, time
 root = pathlib.Path(__file__).resolve().parent.parent
 with tempfile.TemporaryDirectory(prefix='infraproxy-browser-test-') as temp:
     temp = pathlib.Path(temp)
     (temp/'main.swift').write_bytes((root/'Tests/BrowserHarness.swift').read_bytes())
-    subprocess.run(['swiftc','-target','arm64-apple-macosx15.5',str(root/'Sources/BrowserServer.swift'),str(temp/'main.swift'),'-o',str(temp/'server')], check=True)
+    subprocess.run(['swiftc','-target',f'{platform.machine()}-apple-macosx15.5',str(root/'Sources/BrowserServer.swift'),str(temp/'main.swift'),'-o',str(temp/'server')], check=True)
     probe = socket.socket(); probe.bind(('127.0.0.1',0)); port = probe.getsockname()[1]; probe.close()
     process = subprocess.Popen([str(temp/'server'),str(root/'InfraProxy.app/Contents/Resources/Web'),str(root/'InfraProxy.app/Contents/MacOS/TerminalHost'),str(port),str(temp/'ready.json')], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     sockets=[]

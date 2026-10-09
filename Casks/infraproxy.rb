@@ -2,10 +2,10 @@ cask "infraproxy" do
   version "2.7.0"
   sha256 "eb1bacca882f709f26506a1237e693e5cb0d7b80640b4008204924798b3c2f6a"
 
-  url "https://github.com/netsecdevio/infraproxy/releases/download/v#{version}/InfraProxy-#{version}.dmg"
+  url "https://github.com/netsecdevio/infravibe/releases/download/v#{version}/InfraProxy-#{version}.dmg"
   name "InfraProxy"
   desc "Infrastructure connections and remote browser terminals"
-  homepage "https://github.com/netsecdevio/infraproxy"
+  homepage "https://github.com/netsecdevio/infravibe"
 
   auto_updates true
   depends_on macos: ">= :sequoia"

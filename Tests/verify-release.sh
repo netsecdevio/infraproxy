@@ -15,7 +15,7 @@ assert enclosure is not None
 signature = enclosure.attrib[ns + 'edSignature']
 archive = next(root.glob('*.dmg'))
 assert int(enclosure.attrib['length']) == archive.stat().st_size
-assert enclosure.attrib['url'].startswith('https://github.com/netsecdevio/infraproxy/releases/download/v')
+assert enclosure.attrib['url'].startswith('https://github.com/netsecdevio/infravibe/releases/download/v')
 assert enclosure.attrib['url'].endswith('/' + archive.name)
 assert item.find(ns + 'version') is not None
 assert item.find(ns + 'minimumSystemVersion').text == '15.5'

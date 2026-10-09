@@ -9,7 +9,7 @@ BUNDLE_ID="com.dynadobe.infraproxy"
 ENTITLEMENTS="infraproxy.entitlements"
 APP_VERSION="2.7.0"
 APP_BUILD="10"
-SPARKLE_FEED="https://github.com/netsecdevio/infraproxy/releases/latest/download/appcast.xml"
+SPARKLE_FEED="https://github.com/netsecdevio/infravibe/releases/latest/download/appcast.xml"
 
 # Parse arguments
 NOTARIZE=false
